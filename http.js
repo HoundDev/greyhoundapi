@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const verifySignature = require('verify-xrpl-signature').verifySignature;
 const Storage = require("./storage.js");
 const XrplHelpers = require('./xrp');
+const log = require('debug')('greyhoundapi')
 const e = require("express");
 const paginate = require("jw-paginate");
 require("dotenv").config();
