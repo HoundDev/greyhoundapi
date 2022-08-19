@@ -119,7 +119,6 @@ app.use("/api/richlist", async function (req, res, next) {
   } catch {}
 });
 
-
 app.use("/api/mainData", async function (req, res, next) {
   try {
     const client = new xrpl.Client(process.env.XRPL_RPC);
@@ -129,12 +128,14 @@ app.use("/api/mainData", async function (req, res, next) {
     let transactions = await xrplHelper.getAccountTransactions(client,req.body.xrpAddress);
     let account_info = await xrplHelper.getAccountLines(client,process.env.GREYHOUND_ISSUER);
     let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
+    let token_volume = await getCachedVolume('12m');
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
       Transactions: transactions,
       Account_Info: account_info,
       Account_Lines: account_lines,
-      UserTier: tierLevel
+      UserTier: tierLevel,
+      TokenVolume: token_volume
     }
     await client.disconnect();
     res.send(responsePayload);
@@ -143,6 +144,22 @@ app.use("/api/mainData", async function (req, res, next) {
     res.send({});
   }
 });
+
+async function getCachedVolume(range) {
+  return new Promise((resolve, reject) => {
+    fs.readFile("../.dashboard.cache/volume_data.json", "utf8", (err, jsonString) => {
+      if (err) {
+        reject(err);
+      }
+      try {
+        const volume = JSON.parse(jsonString);
+        resolve(volume[range]);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }) 
+}
 
 //Rate Limiting
 const apiLimiter = rateLimit({
