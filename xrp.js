@@ -59,6 +59,13 @@ class XrplHelpers {
         }
         return nftSellOffers.result;
   }
+  
+  async getTransactionFee(client){
+    const response = await client.request({
+        command: "fee",
+      });
+      return response.result.drops.minimum_fee;
+  }
 
   TransactionRequestPayload(xrpAddress) {
     return {

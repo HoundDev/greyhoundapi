@@ -128,6 +128,7 @@ app.use("/api/mainData", async function (req, res, next) {
     let transactions = await xrplHelper.getAccountTransactions(client,req.body.xrpAddress);
     let account_info = await xrplHelper.getAccountLines(client,process.env.GREYHOUND_ISSUER);
     let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
+    let tx_fees = await xrplHelper.getTransactionFee(client);
     let token_volume = await getCachedVolume('12m');
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
@@ -135,7 +136,8 @@ app.use("/api/mainData", async function (req, res, next) {
       Account_Info: account_info,
       Account_Lines: account_lines,
       UserTier: tierLevel,
-      TokenVolume: token_volume
+      TokenVolume: token_volume,
+      TransactionFee: tx_fees
     }
     await client.disconnect();
     res.send(responsePayload);
