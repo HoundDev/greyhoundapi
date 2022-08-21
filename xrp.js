@@ -64,7 +64,7 @@ class XrplHelpers {
     const response = await client.request({
         command: "fee",
       });
-      return response.result.drops.minimum_fee;
+      return response.result.drops.base_fee;
   }
 
   TransactionRequestPayload(xrpAddress) {
