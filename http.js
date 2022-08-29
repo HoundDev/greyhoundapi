@@ -14,6 +14,7 @@ const Storage = require("./storage.js");
 const XrplHelpers = require('./xrp');
 const log = require('debug')('greyhoundapi')
 const e = require("express");
+const requestify = require("requestify");
 const paginate = require("jw-paginate");
 require("dotenv").config();
 
@@ -130,6 +131,8 @@ app.use("/api/mainData", async function (req, res, next) {
     let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
     let tx_fees = await xrplHelper.getTransactionFee(client);
     let token_volume = await getCachedVolume('12m');
+    let xrpprices = await xrplHelper.getXrpPrice();
+    let ghprices = await xrplHelper.getGhPrice();
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
       Transactions: transactions,
@@ -137,7 +140,9 @@ app.use("/api/mainData", async function (req, res, next) {
       Account_Lines: account_lines,
       UserTier: tierLevel,
       TokenVolume: token_volume,
-      TransactionFee: tx_fees
+      TransactionFee: tx_fees,
+      XRPPrices: xrpprices,
+      GHPrices: ghprices
     }
     await client.disconnect();
     res.send(responsePayload);
