@@ -3,27 +3,27 @@ require("dotenv").config();
 const requestify = require("requestify");
 
 class XrplHelpers {
-  
+
   async getXrpPrice() {
     const response = await requestify.get(
-      "https://api.sologenic.org/api/v1/trades?symbol=XRP%2FUSD%2Brhub8VRN55s94qWKDv6jmDy1pUykJzF3wq"
+      "https://api.onthedex.live/public/v1/ohlc?base=XRP&quote=USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq&bars=30&interval=D&tf=ISO"
     );
     let body = response.getBody();
     let prices = [];
-    for (var i = 0; i < 10; i++) {
-      prices.push(body[i].price);
+    for (var i = 0; i < 30; i++) {
+      prices.push(body.data.ohlc[i].c);
     }
     return prices;
   }
 
   async getGhPrice() {
     const response = await requestify.get(
-      'https://api.sologenic.org/api/v1/trades?symbol=47726579686F756E640000000000000000000000%2BrJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ%2FXRP'
+      'https://api.onthedex.live/public/v1/ohlc?base=Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ&quote=XRP&bars=30&interval=D&tf=ISO'
     );
     let body = response.getBody();
     let prices = [];
-    for (var i = 0; i < 10; i++) {
-      prices.push(body[i].price);
+    for (var i = 0; i < 30; i++) {
+      prices.push(body.data.ohlc[i].c);
     }
     return prices;
   }
