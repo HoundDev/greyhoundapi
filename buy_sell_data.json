@@ -1,0 +1,136 @@
+{
+  "buyData": [
+    {
+      "address": "rGjArcNUnT4Tu6r5czjgtRLbXqoPdHVEHZ",
+      "price": "0.00000270297297917",
+      "TakerGetsXRP": 349.026321,
+      "amountGH": "129126825.7914876"
+    },
+    {
+      "address": "rHeFYsrHfwUe9iudKDJdFXRmXkmdoj3jN9",
+      "price": "0.00000260299900000",
+      "TakerGetsXRP": 2.602999,
+      "amountGH": "1000000"
+    },
+    {
+      "address": "rKNiHD7KwCU6ahi8iXMoASn4ZXqJ1n37n7",
+      "price": "0.00000260200000000",
+      "TakerGetsXRP": 3.2525,
+      "amountGH": "1250000"
+    },
+    {
+      "address": "r3qJDibfFppoNS9Xi3m2UpK5U8ZCrfvarW",
+      "price": "0.00000256099962251",
+      "TakerGetsXRP": 6.006264,
+      "amountGH": "2345281.095398541"
+    },
+    {
+      "address": "r3qJDibfFppoNS9Xi3m2UpK5U8ZCrfvarW",
+      "price": "0.00000256000000000",
+      "TakerGetsXRP": 6.4,
+      "amountGH": "2500000"
+    },
+    {
+      "address": "r9Lvcdm59GbNyEBkCehVfATvsmnMRDDLZ3",
+      "price": "0.00000255900000000",
+      "TakerGetsXRP": 25.59,
+      "amountGH": "10000000"
+    },
+    {
+      "address": "r43hxvGDZqmKmLugK8oJ32r2f4rxuvUntb",
+      "price": "0.00000250000000000",
+      "TakerGetsXRP": 20.0,
+      "amountGH": "8000000"
+    },
+    {
+      "address": "rh9MmnkJaQ1P1Y6ZzmRFpQAc9UdH6pKTiS",
+      "price": "0.00000226012340000",
+      "TakerGetsXRP": 67.803702,
+      "amountGH": "30000000"
+    },
+    {
+      "address": "rU1tArrr24FMw3iztqeVBJqQwiGFyj97ju",
+      "price": "0.00000225902423707",
+      "TakerGetsXRP": 100.0,
+      "amountGH": "44266900"
+    },
+    {
+      "address": "rGT6ze5CuPEUzsk92YnLLkEqjv6qqhabrF",
+      "price": "0.00000225901913389",
+      "TakerGetsXRP": 500.0,
+      "amountGH": "221335000"
+    }
+  ],
+  "sellData": [
+    {
+      "buyer": "rGjArcNUnT4Tu6r5czjgtRLbXqoPdHVEHZ",
+      "seller": "rfP8MUEvMmJmS6Po3TUAJx5D6vTV8d1no1",
+      "price": "0.00000271",
+      "amount": "100",
+      "priceXrp": 0.000271
+    },
+    {
+      "buyer": "rGjArcNUnT4Tu6r5czjgtRLbXqoPdHVEHZ",
+      "seller": "r4A8CVAgcxBSvrw45YgjQEgwAC5zikx5ZF",
+      "price": "0.0000027029730122",
+      "amount": "60342920.6515672",
+      "priceXrp": 163.10528599851216
+    },
+    {
+      "buyer": "rU1tArrr24FMw3iztqeVBJqQwiGFyj97ju",
+      "seller": "r4A8CVAgcxBSvrw45YgjQEgwAC5zikx5ZF",
+      "price": "0.0000027029801954",
+      "amount": "7827792.09268375",
+      "priceXrp": 21.158367000232897
+    },
+    {
+      "buyer": "rMDUeK2Fw7j2BURp2RrQhaf4zfL1TiFiiJ",
+      "seller": "r4A8CVAgcxBSvrw45YgjQEgwAC5zikx5ZF",
+      "price": "0.000001355140186",
+      "amount": "0.737931035",
+      "priceXrp": 1.0000000000250726e-06
+    },
+    {
+      "buyer": "rU1tArrr24FMw3iztqeVBJqQwiGFyj97ju",
+      "seller": "r4A8CVAgcxBSvrw45YgjQEgwAC5zikx5ZF",
+      "price": "0.0000027029803358",
+      "amount": "29168407.90731625",
+      "priceXrp": 78.84163300006905
+    },
+    {
+      "buyer": "rnRUpGVGaBJ9rTWwtukdqW9wQ4zXReDw3E",
+      "seller": "r4A8CVAgcxBSvrw45YgjQEgwAC5zikx5ZF",
+      "price": "0.00000277",
+      "amount": "1000000",
+      "priceXrp": 2.77
+    },
+    {
+      "buyer": "rnRUpGVGaBJ9rTWwtukdqW9wQ4zXReDw3E",
+      "seller": "r4A8CVAgcxBSvrw45YgjQEgwAC5zikx5ZF",
+      "price": "0.00000279",
+      "amount": "100000",
+      "priceXrp": 0.27899999999999997
+    },
+    {
+      "buyer": "rGTqpQarhBUfzXpogD7PUKzbW5RcLnaWpv",
+      "seller": "rLyh2jAvXnqnVGwVHGNNEBADcLSeUdEE26",
+      "price": "0.000003187",
+      "amount": "2354900.21964229",
+      "priceXrp": 7.505066999999978
+    },
+    {
+      "buyer": "rGTqpQarhBUfzXpogD7PUKzbW5RcLnaWpv",
+      "seller": "ratE23df1ncLfSztLGPo5GT27CxHvffgFL",
+      "price": "0.0000027699992344",
+      "amount": "756293.7108253054",
+      "priceXrp": 2.094932999967631
+    },
+    {
+      "buyer": "rLyh2jAvXnqnVGwVHGNNEBADcLSeUdEE26",
+      "seller": "rEAVB9QLXXsoeccVEvd2y7GGtgDhDFFVRG",
+      "price": "0.0000027029999921",
+      "amount": "68916983.1832852",
+      "priceXrp": 186.28260499997575
+    }
+  ]
+}
