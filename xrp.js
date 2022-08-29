@@ -1,6 +1,32 @@
 const xrpl = require("xrpl");
 require("dotenv").config();
+const requestify = require("requestify");
+
 class XrplHelpers {
+  
+  async getXrpPrice() {
+    const response = await requestify.get(
+      "https://api.sologenic.org/api/v1/trades?symbol=XRP%2FUSD%2Brhub8VRN55s94qWKDv6jmDy1pUykJzF3wq"
+    );
+    let body = response.getBody();
+    let prices = [];
+    for (var i = 0; i < 10; i++) {
+      prices.push(body[i].price);
+    }
+    return prices;
+  }
+
+  async getGhPrice() {
+    const response = await requestify.get(
+      'https://api.sologenic.org/api/v1/trades?symbol=47726579686F756E640000000000000000000000%2BrJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ%2FXRP'
+    );
+    let body = response.getBody();
+    let prices = [];
+    for (var i = 0; i < 10; i++) {
+      prices.push(body[i].price);
+    }
+    return prices;
+  }
 
   async getAccountInfo(client, xrpAddress) {
     const response = await client.request({
