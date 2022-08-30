@@ -131,8 +131,8 @@ app.use("/api/mainData", async function (req, res, next) {
     let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
     let tx_fees = await xrplHelper.getTransactionFee(client);
     let token_volume = await getCachedVolume('12m');
-	let transaction_buy = await getCachedBuy('buyData');
-	let transaction_sell = await getCachedSell('sellData');
+    let transaction_buy = await getCachedOrders('buyData');
+    let transaction_sell = await getCachedOrders('sellData');
     let xrpprices = await xrplHelper.getXrpPrice();
     let ghprices = await xrplHelper.getGhPrice();
 
@@ -143,8 +143,8 @@ app.use("/api/mainData", async function (req, res, next) {
       Account_Lines: account_lines,
       UserTier: tierLevel,
       TokenVolume: token_volume,
-	  TokenBuy: transaction_buy,
-	  TokenSell: transaction_sell,
+      TokenBuy: transaction_buy,
+      TokenSell: transaction_sell,
       TransactionFee: tx_fees,
       XRPPrices: xrpprices,
       GHPrices: ghprices
@@ -172,30 +172,16 @@ async function getCachedVolume(range) {
     });
   }) 
 }
-async function getCachedBuy(range) {
+
+async function getCachedOrders(orderType) {
   return new Promise((resolve, reject) => {
     fs.readFile("../.dashboard.cache/buy_sell_data.json", "utf8", (err, jsonString) => {
       if (err) {
         reject(err);
       }
       try {
-        const buy = JSON.parse(jsonString);
-        resolve(buy[range]);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }) 
-}
-async function getCachedSell(range) {
-  return new Promise((resolve, reject) => {
-    fs.readFile("../.dashboard.cache/buy_sell_data.json", "utf8", (err, jsonString) => {
-      if (err) {
-        reject(err);
-      }
-      try {
-        const sell = JSON.parse(jsonString);
-        resolve(sell[range]);
+        const marketData = JSON.parse(jsonString);
+        resolve(marketData[orderType]);
       } catch (err) {
         reject(err);
       }
