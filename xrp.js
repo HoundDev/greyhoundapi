@@ -1,31 +1,22 @@
 const xrpl = require("xrpl");
 require("dotenv").config();
-const requestify = require("requestify");
+const axios = require('axios').default;
 
 class XrplHelpers {
 
-  async getXrpPrice() {
-    const response = await requestify.get(
-      "https://api.onthedex.live/public/v1/ohlc?base=XRP&quote=USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq&bars=30&interval=D&tf=ISO"
-    );
-    let body = response.getBody();
-    let prices = [];
-    for (var i = 0; i < 30; i++) {
-      prices.push(body.data.ohlc[i].c);
-    }
-    return prices;
-  }
+  async getTokenPrice(base, quote) {
+    try {
+      const response = await axios.get('https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=' + quote + '&bars=30&interval=D&tf=ISO');
+      let body       = response['data'];
+      let prices     = [];
 
-  async getGhPrice() {
-    const response = await requestify.get(
-      'https://api.onthedex.live/public/v1/ohlc?base=Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ&quote=XRP&bars=30&interval=D&tf=ISO'
-    );
-    let body = response.getBody();
-    let prices = [];
-    for (var i = 0; i < 30; i++) {
-      prices.push(body.data.ohlc[i].c);
+      for (var i = 0; i < 30; i++) {
+        prices.push(body.data.ohlc[i].c);
+      }
+      return prices;
+    } catch (error) {
+      console.error(error);
     }
-    return prices;
   }
 
   async getAccountInfo(client, xrpAddress) {

@@ -14,13 +14,13 @@ const Storage = require("./storage.js");
 const XrplHelpers = require('./xrp');
 const log = require('debug')('greyhoundapi')
 const e = require("express");
-const requestify = require("requestify");
 const paginate = require("jw-paginate");
 require("dotenv").config();
 
 // Create Express Server
 const app = express();
 app.use(cors());
+
 // Configuration
 const PORT = process.env.API_SERVICE_PORT;
 const API_SERVICE_URL = process.env.API_SERVICE_URL;
@@ -133,8 +133,10 @@ app.use("/api/mainData", async function (req, res, next) {
     let token_volume = await getCachedVolume('12m');
     let transaction_buy = await getCachedOrders('buyData');
     let transaction_sell = await getCachedOrders('sellData');
-    let xrpprices = await xrplHelper.getXrpPrice();
-    let ghprices = await xrplHelper.getGhPrice();
+    //let xrpprices = await xrplHelper.getXrpPrice();
+    let xrpprices = await xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq');
+    let ghprices = await xrplHelper.getTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
+    //let ghprices = await xrplHelper.getGhPrice();
 
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
