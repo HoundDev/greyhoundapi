@@ -133,10 +133,8 @@ app.use("/api/mainData", async function (req, res, next) {
     let token_volume = await getCachedVolume('12m');
     let transaction_buy = await getCachedOrders('buyData');
     let transaction_sell = await getCachedOrders('sellData');
-    //let xrpprices = await xrplHelper.getXrpPrice();
     let xrpprices = await xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq');
     let ghprices = await xrplHelper.getTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
-    //let ghprices = await xrplHelper.getGhPrice();
 
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
