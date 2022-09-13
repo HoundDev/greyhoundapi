@@ -147,6 +147,11 @@ class Storage {
       [
       ]
     );
+    db.run(
+      `INSERT INTO RichList(xrpAddress,balance,LastUpdated) select xrpAddress,balance,LastUpdated from RichListTemp order by balance desc`,
+      [
+      ]
+    )
   }
 
    insertRichList(db, xrpAddress, balance, LastUpdated) {

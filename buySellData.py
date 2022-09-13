@@ -1,5 +1,4 @@
 import json
-import pprint
 import requests
 from xrpl.clients import JsonRpcClient
 from xrpl.models.requests import BookOffers
