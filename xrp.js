@@ -20,9 +20,10 @@ class XrplHelpers {
   }
 
   async getLiveTokenPrice(base){
-  const url = 'https://api.onthedex.live/public/v1/aggregator?token=' + base;
+  const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
   const response = await axios.get(url);
-  return response.data.tokens[0].dex.pairs[0].last;
+  console.log(response.data.data.ohlc[0].c);
+  return response.data.data['ohlc'][response.data.data['ohlc'].length - 1].c;
   }
 
   async getLiveXrpPrice() {
