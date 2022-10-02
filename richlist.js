@@ -8,7 +8,7 @@ var data = [];
 const accountLinesRequest = {
     command: "account_lines",
     account: process.env.GREYHOUND_ISSUER,
-    limit: 400
+    limit: 1000
   };
   
   async function getAccountLines(client, marker) {
@@ -37,7 +37,7 @@ const accountLinesRequest = {
   }
 
 async function main() {
-    const client = new xrpl.Client("wss://s1.ripple.com");
+    const client = new xrpl.Client("wss://s2.ripple.com");
     var storage = new Storage();
     var db = storage.getInstance();
   try {

@@ -90,6 +90,10 @@ app.use("/api/richlist", async function (req, res, next) {
     console.log(richListArchive)
     let sum = await storage.selectGreyHoundSum(db);
     let newObj = []
+    let tlData = await getCachedTl('tlData');
+    let totalTls = await getCachedTl('totalTls');
+    let totalHolders = await getCachedTl('totalHolders');
+    let holderData = await getCachedTl('holderData');
     //Create object
     for(let i = 0;i < rows.length; i++)
     {
@@ -116,7 +120,7 @@ app.use("/api/richlist", async function (req, res, next) {
 
     // return pager object and current page of items
     //console.log(pager)
-    res.send({ pager, pageOfItems, sum });
+    res.send({ pager, pageOfItems, sum , tlData, totalTls, totalHolders, holderData});
   } catch {}
 });
 
@@ -133,9 +137,17 @@ app.use("/api/mainData", async function (req, res, next) {
     let token_volume = await getCachedVolume('12m');
     let transaction_buy = await getCachedOrders('buyData');
     let transaction_sell = await getCachedOrders('sellData');
+    //let xrpprices = await xrplHelper.getXrpPrice();
     let xrpprices = await xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq');
     let ghprices = await xrplHelper.getTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
+    let curGh = await xrplHelper.getLiveTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
+    let curXrp = await xrplHelper.getLiveXrpPrice();
+    let tlData = await getCachedTl('tlData');
+    let totalTls = await getCachedTl('totalTls');
+    let totalHolders = await getCachedTl('totalHolders');
+    let holderData = await getCachedTl('holderData');
 
+    
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
       Transactions: transactions,
@@ -147,7 +159,13 @@ app.use("/api/mainData", async function (req, res, next) {
       TokenSell: transaction_sell,
       TransactionFee: tx_fees,
       XRPPrices: xrpprices,
-      GHPrices: ghprices
+      GHPrices: ghprices,
+      CurrentGH: curGh,
+      CurrentXRP: curXrp,
+      TlData: tlData,
+      TotalTls: totalTls,
+      TotalHolders: totalHolders,
+      HolderData: holderData
     }
     await client.disconnect();
     res.send(responsePayload);
@@ -187,6 +205,22 @@ async function getCachedOrders(orderType) {
       }
     });
   }) 
+}
+
+async function getCachedTl(orderType){
+  return new Promise((resolve, reject) => {
+    fs.readFile("../.dashboard.cache/tls.json", "utf8", (err, jsonString) => {
+      if (err) {
+        reject(err);
+      }
+      try {
+        const marketData = JSON.parse(jsonString);
+        resolve(marketData[orderType]);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  })
 }
 
 //Rate Limiting

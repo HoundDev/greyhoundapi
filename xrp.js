@@ -19,6 +19,19 @@ class XrplHelpers {
     }
   }
 
+  async getLiveTokenPrice(base){
+  const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
+  const response = await axios.get(url);
+  console.log(response.data.data.ohlc[0].c);
+  return response.data.data['ohlc'][response.data.data['ohlc'].length - 1].c;
+  }
+
+  async getLiveXrpPrice() {
+    const url = 'https://api.binance.com/api/v3/ticker/price?symbol=XRPUSDT';
+    const response = await axios.get(url);
+    return response.data.price;
+  }
+
   async getAccountInfo(client, xrpAddress) {
     const response = await client.request({
       command: "account_info",

@@ -50,5 +50,5 @@ json_client = JsonRpcClient('https://s2.ripple.com:51234/')
 holders,tl = get_all_holders(json_client, '47726579686F756E640000000000000000000000', 'rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ')
 toBeWritten = {'tl': tl, 'holders': holders}
 import json
-with open('trustlines_data.json', 'w') as f:
+with open('.dashboard.cache/trustlines_data.json', 'w') as f:
     json.dump(toBeWritten, f, indent=4)
