@@ -146,7 +146,6 @@ app.use("/api/mainData", async function (req, res, next) {
     let totalTls = await getCachedTl('totalTls');
     let totalHolders = await getCachedTl('totalHolders');
     let holderData = await getCachedTl('holderData');
-
     
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
@@ -175,6 +174,48 @@ app.use("/api/mainData", async function (req, res, next) {
   }
 });
 
+//an endpoint which stores messages sent to the endpoint in a json file
+app.use("/api/submit", async function (req, res, next) {
+  try {
+    //store the request body in a variable and then write it to a json file
+    let data = req.body;
+    let json = JSON.stringify(data);
+    let path = "../.dashboard.cache/data.json"
+    //read the file and then append the new data to it
+    fs.readFile(path, 'utf8', function readFileCallback(err, file){
+      if (err){
+          console.log(err);
+      } else {
+      //parse the file to get the json object
+      file = JSON.parse(file); //now it an object
+      //add the new data to the object
+      file.push(data); //add some data
+      //write the new object to the file
+      json = JSON.stringify(file); //convert it back to json
+      fs.writeFile(path, json, 'utf8', function(err) {
+        if(err) {
+          console.log(err);
+        }
+      }); // write it back
+      }
+    });
+    res.send({success: true});
+  } catch(err) {
+    console.log(err)
+    res.send({success: false});
+  }
+});
+
+app.use("/api/notifs", async function (req, res, next) {
+  try {
+    let notifs = await getNotifs();
+    res.send(notifs);
+  } catch(err) {
+    console.log(err)
+    res.send({success: false});
+  }
+});
+
 async function getCachedVolume(range) {
   return new Promise((resolve, reject) => {
     fs.readFile("../.dashboard.cache/volume_data.json", "utf8", (err, jsonString) => {
@@ -190,6 +231,23 @@ async function getCachedVolume(range) {
     });
   }) 
 }
+
+async function getNotifs() {
+  return new Promise((resolve, reject) => {
+    fs.readFile("../.dashboard.cache/data.json", "utf8", (err, jsonString) => {
+      if (err) {
+        reject(err);
+      }
+      try {
+        const notifs = JSON.parse(jsonString);
+        resolve(notifs);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  })
+}
+
 
 async function getCachedOrders(orderType) {
   return new Promise((resolve, reject) => {
