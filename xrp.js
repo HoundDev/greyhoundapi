@@ -107,11 +107,11 @@ class XrplHelpers {
   CreateOfferPayload() {
     return {
       TransactionType: "NFTokenCreateOffer",
-      Account: process.env.MULTI_SIG_WALLET_ADDRESS,
+      Account: process.env.GREYHOUND_ISSUER,
       TokenID: "",
       Destination: "",
       Amount: "0",
-      Flags: xrpl.NFTokenCreateOfferFlags.tfSellToken,
+      Flags: xrpl.NFTokenCreateOfferFlags.tfSellNFToken,
       Sequence: 0,
       Fee: "1000",
       Memos: [
@@ -127,7 +127,7 @@ class XrplHelpers {
   TokenMintPayload() {
     return {
       TransactionType: "NFTokenMint",
-      Account: process.env.MULTI_SIG_WALLET_ADDRESS,
+      Account: process.env.GREYHOUND_ISSUER,
       Flags: xrpl.NFTokenMintFlags.tfTransferable,
       URI: "",
       TokenTaxon: 0,

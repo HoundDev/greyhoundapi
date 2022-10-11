@@ -16,6 +16,7 @@ const log = require('debug')('greyhoundapi')
 const e = require("express");
 const paginate = require("jw-paginate");
 require("dotenv").config();
+const axios = require('axios');
 
 // Create Express Server
 const app = express();
@@ -94,6 +95,7 @@ app.use("/api/richlist", async function (req, res, next) {
     let totalTls = await getCachedTl('totalTls');
     let totalHolders = await getCachedTl('totalHolders');
     let holderData = await getCachedTl('holderData');
+    let rank = await storage.selectRank(db,req.body.address);
     //Create object
     for(let i = 0;i < rows.length; i++)
     {
@@ -120,7 +122,7 @@ app.use("/api/richlist", async function (req, res, next) {
 
     // return pager object and current page of items
     //console.log(pager)
-    res.send({ pager, pageOfItems, sum , tlData, totalTls, totalHolders, holderData});
+    res.send({ pager, pageOfItems, sum , tlData, totalTls, totalHolders, holderData, rank});
   } catch {}
 });
 
@@ -146,7 +148,7 @@ app.use("/api/mainData", async function (req, res, next) {
     let totalTls = await getCachedTl('totalTls');
     let totalHolders = await getCachedTl('totalHolders');
     let holderData = await getCachedTl('holderData');
-    
+    let change = await getBalanceChange(req.body.xrpAddress);
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
       Transactions: transactions,
@@ -164,7 +166,8 @@ app.use("/api/mainData", async function (req, res, next) {
       TlData: tlData,
       TotalTls: totalTls,
       TotalHolders: totalHolders,
-      HolderData: holderData
+      HolderData: holderData,
+      Change: change
     }
     await client.disconnect();
     res.send(responsePayload);
@@ -215,6 +218,49 @@ app.use("/api/notifs", async function (req, res, next) {
     res.send({success: false});
   }
 });
+
+async function getBalanceChange(address) {
+  const client = new xrpl.Client('wss://xrplcluster.com');
+  const time = Math.floor(Date.now() / 1000);
+  let time30dayBefore = time - 2592000;
+  let URL = 'https://s1.xrplmeta.org/ledger?time=' + time30dayBefore;
+  let response = await axios.get(URL);
+  let ledger = response.data.sequence;
+  console.log(ledger);
+  await client.connect();
+  const account = await client.request({
+    command: 'account_lines',
+    account: address,
+    ledger_index: ledger,
+    connectionTimeout: 10000
+    });
+  let pastBalance = 0;
+    // console.log(account);
+    let lines = account.result.lines
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].currency === '47726579686F756E640000000000000000000000' && lines[i].account === 'rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ') {
+            // console.log(lines[i].balance);
+            pastBalance = lines[i].balance;
+        }
+    }
+    const account2 = await client.request({
+      command: 'account_lines',
+      account: address,
+      connectionTimeout: 10000
+      });
+    let currentBalance = 0;
+      
+      let lines2 = account2.result.lines
+      for (let i = 0; i < lines2.length; i++) {
+          if (lines2[i].currency === '47726579686F756E640000000000000000000000' && lines2[i].account === 'rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ') {
+              // console.log(lines[i].balance);
+              currentBalance = lines2[i].balance;
+          }
+      }
+      let balanceChangePercent = ((currentBalance - pastBalance) / pastBalance) * 100;
+      client.disconnect();
+      return balanceChangePercent;
+}
 
 async function getCachedVolume(range) {
   return new Promise((resolve, reject) => {

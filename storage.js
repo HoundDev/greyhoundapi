@@ -269,18 +269,18 @@ class Storage {
     });
   }
 
-  async selectRichListDaily(db) {
+  async selectRank(db,xrpAddress) {
     return new Promise(function (resolve, reject) {
-      let sql = `SELECT * FROM RichListDaily ORDER BY ID asc`;
+      let sql = `SELECT id FROM RichList WHERE xrpAddress = ? `;
       let returnVal = undefined;
 
       try {
-        db.all(sql, [], (err, rows) => {
+        db.all(sql, [xrpAddress], (err, rows) => {
           if (err) {
             console.log("Record Exists Error: " + err);
           }
           if (rows.length > 0) {
-            resolve(rows);
+            resolve(rows[0].id);
           } else {
             resolve([]);
           }
