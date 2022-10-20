@@ -314,46 +314,46 @@ class Storage {
   }
 
 
-  // async selectTier(db, xrpAddress) {
-  //   return new Promise(function (resolve, reject) {
-  //     let sql = `SELECT balance FROM Snapshot WHERE xrpAddress = ? LIMIT 1`;
-  //     let returnVal = undefined;
+  async selectTier(db, xrpAddress) {
+    return new Promise(function (resolve, reject) {
+      let sql = `SELECT balance FROM Snapshot WHERE xrpAddress = ? LIMIT 1`;
+      let returnVal = undefined;
 
-  //     try {
-  //       db.all(sql, [xrpAddress], (err, rows) => {
-  //         if (err) {
-  //           console.log("Record Exists Error: " + err);
-  //         }
-  //         console.log(rows)
-  //         if (rows.length > 0) {
-  //           var bal = rows[0].balance;
-  //           if(bal >= 100000000 && bal < 250000000)
-  //           {
-  //             resolve({ tier: 'Standard', balance: bal});
-  //           }
-  //           if(bal >= 250000000 && bal < 500000000)
-  //           {
-  //             resolve({ tier: 'Rare', balance: bal});
-  //           }
-  //           if(bal >= 500000000 && bal < 1000000000)
-  //           {
-  //             resolve({ tier: 'Elite', balance: bal});
-  //           }
-  //           if(bal >= 1000000000)
-  //           {
-  //             resolve({ tier: 'Legendary', balance: bal});
-  //           }
+      try {
+        db.all(sql, [xrpAddress], (err, rows) => {
+          if (err) {
+            console.log("Record Exists Error: " + err);
+          }
+          console.log(rows)
+          if (rows.length > 0) {
+            var bal = rows[0].balance;
+            if(bal >= 100000000 && bal < 250000000)
+            {
+              resolve({ tier: 'Standard', balance: bal});
+            }
+            if(bal >= 250000000 && bal < 500000000)
+            {
+              resolve({ tier: 'Rare', balance: bal});
+            }
+            if(bal >= 500000000 && bal < 1000000000)
+            {
+              resolve({ tier: 'Elite', balance: bal});
+            }
+            if(bal >= 1000000000)
+            {
+              resolve({ tier: 'Legendary', balance: bal});
+            }
 
-  //           resolve({ tier: 'None', balance: 0});
-  //         } else {
-  //           resolve({ tier: 'None', balance: 0});
-  //         }
-  //       });
-  //     } catch (err) {
-  //       console.log(err);
-  //     }
-  //   });
-  // }
+            resolve({ tier: 'None', balance: 0});
+          } else {
+            resolve({ tier: 'None', balance: 0});
+          }
+        });
+      } catch (err) {
+        console.log(err);
+      }
+    });
+  }
 
 
    generateUUID() { // Public Domain/MIT

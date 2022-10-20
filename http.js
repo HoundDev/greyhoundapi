@@ -95,7 +95,7 @@ app.use("/api/richlist", async function (req, res, next) {
     let totalTls = await getCachedTl('totalTls');
     let totalHolders = await getCachedTl('totalHolders');
     let holderData = await getCachedTl('holderData');
-    // let rank = await storage.selectRank(db,req.body.address);
+    let rank = await storage.selectRank(db,req.body.address);
     //Create object
     for(let i = 0;i < rows.length; i++)
     {
@@ -122,7 +122,7 @@ app.use("/api/richlist", async function (req, res, next) {
 
     // return pager object and current page of items
     //console.log(pager)
-    res.send({ pager, pageOfItems, sum , tlData, totalTls, totalHolders, holderData});
+    res.send({ pager, pageOfItems, sum , tlData, totalTls, totalHolders, holderData, rank});
   } catch {}
 });
 
