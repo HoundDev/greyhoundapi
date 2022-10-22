@@ -76,6 +76,17 @@ class XrplHelpers {
     return response.result;
   }
 
+  async getBalance(client, xrpAddress) {
+    const response = await client.request({
+      command: "account_info",
+      account: xrpAddress,
+      ledger_index: "validated",
+    });
+    // return response.result.account_data.Balance;
+    //conver to xrp
+    return xrpl.dropsToXrp(response.result.account_data.Balance);
+  }
+
   async getAccountSellOffers(client, tokenId)
   {
       let nftSellOffers

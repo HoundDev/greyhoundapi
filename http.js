@@ -135,6 +135,7 @@ app.use("/api/mainData", async function (req, res, next) {
     let transactions = await xrplHelper.getAccountTransactions(client,req.body.xrpAddress);
     let account_info = await xrplHelper.getAccountLines(client,process.env.GREYHOUND_ISSUER);
     let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
+    let xrp_balance = await xrplHelper.getBalance(client,req.body.xrpAddress);
     let tx_fees = await xrplHelper.getTransactionFee(client);
     let token_volume = await getCachedVolume('12m');
     let transaction_buy = await getCachedOrders('buyData');
@@ -167,7 +168,8 @@ app.use("/api/mainData", async function (req, res, next) {
       TotalTls: totalTls,
       TotalHolders: totalHolders,
       HolderData: holderData,
-      Change: change
+      Change: change,
+      XRPBalance: xrp_balance
     }
     await client.disconnect();
     res.send(responsePayload);
