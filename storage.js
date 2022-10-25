@@ -76,6 +76,19 @@ class Storage {
         balance REAL NOT NULL,
         snapshotid INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS Users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      xrpAddress TEXT NOT NULL,
+      avatar_url TEXT,
+      name TEXT,
+      verified BOOLEAN,
+      bio TEXT,
+      custom_url TEXT,
+      eligible_og_ad BOOLEAN,
+      eligible_ts_ad BOOLEAN,
+      beta_access BOOLEAN
+    );
       `,
       () => {}
     );
@@ -152,6 +165,55 @@ class Storage {
       [
       ]
     )
+  }
+
+  insertUser(db, jsonData) {
+    //create user table if it doesn't exist
+    db.run(
+      `CREATE TABLE IF NOT EXISTS Users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        xrpAddress TEXT NOT NULL,
+        avatar_url TEXT,
+        name TEXT,
+        verified BOOLEAN,
+        bio TEXT,
+        custom_url TEXT,
+        eligible_og_ad BOOLEAN,
+        eligible_ts_ad BOOLEAN,
+        beta_access BOOLEAN
+      );`
+    );
+    //insert a new row into the users table
+    db.run(
+      `INSERT INTO Users(xrpAddress,avatar_url,name,verified,bio,custom_url,eligible_og_ad,eligible_ts_ad,beta_access) select ?,?,?,?,?,?,?,?,?`,
+      [
+        jsonData.address,
+        jsonData.avatar_url,
+        jsonData.name,
+        jsonData.verified,
+        jsonData.bio,
+        jsonData.custom_url,
+        jsonData.Eligible_og_ad,
+        jsonData.Eligible_ts_ad,
+        jsonData.beta_access
+      ]
+    );
+  }
+
+  checkIfUserExists(db, xrpAddress) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT * FROM Users WHERE xrpAddress = ?`,
+        [xrpAddress],
+        (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row);
+          }
+        }
+      );
+    });
   }
 
    insertRichList(db, xrpAddress, balance, LastUpdated) {

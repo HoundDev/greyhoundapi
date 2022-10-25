@@ -17,7 +17,6 @@ const e = require("express");
 const paginate = require("jw-paginate");
 require("dotenv").config();
 const axios = require('axios');
-const { MongoClient } = require('mongodb');
 
 
 // Create Express Server
@@ -34,12 +33,6 @@ app.use(bodyParser.json());
 var db;
 var storage;
 var xrplHelper;
-var mongodb;
-var collectionMongo;
-var mongoPass = process.env.MONGO_PASSWORD;
-
-const uri = `mongodb+srv://Greyhound:${mongoPass}@cluster0.o5hwdy6.mongodb.net/?retryWrites=true&w=majority`;
-const mongoClient = new MongoClient(uri);
 
 xrplHelper = new XrplHelpers();
 if (!fs.existsSync("./storage.db")) {
@@ -189,19 +182,19 @@ app.use("/api/mainData", async function (req, res, next) {
 
 app.use("/api/registerUser", async function (req, res, next) {
   try {
+    //check if user exists
+    let user = await storage.checkIfUserExists(db,req.body.address);
+    if (user != undefined)
+    {
+      res.send({success: false, message: "User already exists"});
+      console.log("User already exists");
+      return;
+    }
     let tierLevel = await storage.selectTier(db, req.body.address);
     if (tierLevel.balance != 0) {
-        req.body.Eligible_ts_ad = {
-            "balance": tierLevel.balance,
-            "tier": tierLevel.tier
-        };
+        req.body.Eligible_ts_ad = true;
     }
-      const dbM = mongoClient.db('userData');
-      const collection = dbM.collection('users');
-      let result = await collection.findOne({_id: req.body._id});
-      if (result == null) {
-        await collection.insertOne(req.body);
-      }
+      await storage.insertUser(db, req.body);
       console.log("User registered");
       res.send({success: true});
   } catch(err) {
