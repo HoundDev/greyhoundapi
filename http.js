@@ -17,6 +17,8 @@ const e = require("express");
 const paginate = require("jw-paginate");
 require("dotenv").config();
 const axios = require('axios');
+const { MongoClient } = require('mongodb');
+
 
 // Create Express Server
 const app = express();
@@ -32,6 +34,12 @@ app.use(bodyParser.json());
 var db;
 var storage;
 var xrplHelper;
+var mongodb;
+var collectionMongo;
+var mongoPass = process.env.MONGO_PASSWORD;
+
+const uri = `mongodb+srv://Greyhound:${mongoPass}@cluster0.o5hwdy6.mongodb.net/?retryWrites=true&w=majority`;
+const mongoClient = new MongoClient(uri);
 
 xrplHelper = new XrplHelpers();
 if (!fs.existsSync("./storage.db")) {
@@ -177,6 +185,29 @@ app.use("/api/mainData", async function (req, res, next) {
     console.log(err)
     res.send({});
   }
+});
+
+app.use("/api/registerUser", async function (req, res, next) {
+  try {
+    let tierLevel = await storage.selectTier(db, req.body.address);
+    if (tierLevel.balance != 0) {
+        req.body.Eligible_ts_ad = {
+            "balance": tierLevel.balance,
+            "tier": tierLevel.tier
+        };
+    }
+      const dbM = mongoClient.db('userData');
+      const collection = dbM.collection('users');
+      let result = await collection.findOne({_id: req.body._id});
+      if (result == null) {
+        await collection.insertOne(req.body);
+      }
+      console.log("User registered");
+      res.send({success: true});
+  } catch(err) {
+    console.log(`Error: ${err}`);
+    res.send({success: false});
+  } 
 });
 
 //an endpoint which stores messages sent to the endpoint in a json file
