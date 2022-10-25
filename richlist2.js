@@ -26,9 +26,11 @@ const response = axios.get(url)
     console.log('Connected to the storage database.');
   });
   db.serialize(function() {
-    db.run("CREATE TABLE IF NOT EXISTS richlist (id INTEGER PRIMARY KEY AUTOINCREMENT,xrpAddress TEXT NOT NULL,balance REAL NOT NULL,LastUpdated INTEGER NOT NULL)");
-    db.run("DELETE FROM richlist");
-    var stmt = db.prepare("INSERT INTO richlist (xrpAddress,balance,LastUpdated) VALUES (?,?,?)");
+    //drop table named richlist
+    db.run("DROP TABLE IF EXISTS RichList");
+    db.run("CREATE TABLE IF NOT EXISTS RichList (id INTEGER PRIMARY KEY AUTOINCREMENT,xrpAddress TEXT NOT NULL,balance REAL NOT NULL,LastUpdated INTEGER NOT NULL)");
+    db.run("DELETE FROM RichList");
+    var stmt = db.prepare("INSERT INTO RichList (xrpAddress,balance,LastUpdated) VALUES (?,?,?)");
     for (var i = 0; i < sortable.length; i++) {
       stmt.run(sortable[i][0], sortable[i][1], Date.now());
     }
