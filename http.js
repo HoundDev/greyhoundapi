@@ -131,25 +131,34 @@ app.use("/api/mainData", async function (req, res, next) {
   try {
     const client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
-    let GreyHoundAmount = await storage.selectGreyHoundSum(db);
-    let tierLevel = await storage.selectTier(db, req.body.xrpAddress);
-    let transactions = await xrplHelper.getAccountTransactions(client,req.body.xrpAddress);
-    let account_info = await xrplHelper.getAccountLines(client,process.env.GREYHOUND_ISSUER);
-    let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
-    let xrp_balance = await xrplHelper.getBalance(client,req.body.xrpAddress);
-    let tx_fees = await xrplHelper.getTransactionFee(client);
+    // let GreyHoundAmount = await storage.selectGreyHoundSum(db);
+    // let tierLevel = await storage.selectTier(db, req.body.xrpAddress);
+    // let transactions = await xrplHelper.getAccountTransactions(client,req.body.xrpAddress);
+    // let account_info = await xrplHelper.getAccountLines(client,process.env.GREYHOUND_ISSUER);
+    // let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
+    // let xrp_balance = await xrplHelper.getBalance(client,req.body.xrpAddress);
+    // let tx_fees = await xrplHelper.getTransactionFee(client);
+    // let xrpprices = await xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq');
+    // let ghprices = await xrplHelper.getTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
+    // let curGh = await xrplHelper.getLiveTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
+    // let curXrp = await xrplHelper.getLiveXrpPrice();
+    // get all data in parallel
+    const [GreyHoundAmount, tierLevel, transactions, account_info, account_lines, xrp_balance, tx_fees, xrpprices, ghprices, curGh, curXrp] = await Promise.all([
+      storage.selectGreyHoundSum(db),
+      storage.selectTier(db, req.body.xrpAddress),
+      xrplHelper.getAccountTransactions(client,req.body.xrpAddress),
+      xrplHelper.getAccountLines(client,process.env.GREYHOUND_ISSUER),
+      xrplHelper.getAccountLines(client,req.body.xrpAddress),
+      xrplHelper.getBalance(client,req.body.xrpAddress),
+      xrplHelper.getTransactionFee(client),
+      xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq'),
+      xrplHelper.getTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP'),
+      xrplHelper.getLiveTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP'),
+      xrplHelper.getLiveXrpPrice()
+    ]);
     let token_volume = await getCachedVolume('12m');
     let transaction_buy = await getCachedOrders('buyData');
     let transaction_sell = await getCachedOrders('sellData');
-    //let xrpprices = await xrplHelper.getXrpPrice();
-    let xrpprices = await xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq');
-    let ghprices = await xrplHelper.getTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
-    let curGh = await xrplHelper.getLiveTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
-    let curXrp = await xrplHelper.getLiveXrpPrice();
-    let tlData = await getCachedTl('tlData');
-    let totalTls = await getCachedTl('totalTls');
-    let totalHolders = await getCachedTl('totalHolders');
-    let holderData = await getCachedTl('holderData');
     let change = await getBalanceChange(req.body.xrpAddress);
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
@@ -165,10 +174,6 @@ app.use("/api/mainData", async function (req, res, next) {
       GHPrices: ghprices,
       CurrentGH: curGh,
       CurrentXRP: curXrp,
-      TlData: tlData,
-      TotalTls: totalTls,
-      TotalHolders: totalHolders,
-      HolderData: holderData,
       Change: change,
       XRPBalance: xrp_balance
     }
