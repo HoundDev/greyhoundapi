@@ -185,6 +185,19 @@ app.use("/api/mainData", async function (req, res, next) {
   }
 });
 
+app.use("/api/getnfts", async function (req, res, next) {
+  try {
+    const client = new xrpl.Client(process.env.XRPL_RPC);
+    await client.connect();
+    let nfts = await xrplHelper.getAccountNFTs(client, req.body.xrpAddress);
+    await client.disconnect();
+    res.send(nfts);
+  } catch(err) {
+    console.log(err)
+    res.send({});
+  }
+});
+
 app.use("/api/registerUser", async function (req, res, next) {
   try {
     //check if user exists
