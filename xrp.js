@@ -27,9 +27,14 @@ class XrplHelpers {
   }
 
   async getLiveXrpPrice() {
-    const url = 'https://api.binance.com/api/v3/ticker/price?symbol=XRPUSDT';
-    const response = await axios.get(url);
-    return response.data.price;
+try {
+	    const url = 'https://api.binance.com/api/v3/ticker/price?symbol=XRPUSDT';
+	    const response = await axios.get(url);
+	    return response.data.price;
+} catch (error) {
+      console.error(error);
+      return 0;
+} 
   }
 
   async getAccountInfo(client, xrpAddress) {
