@@ -181,7 +181,7 @@ app.use("/api/mainData", async function (req, res, next) {
     res.send(responsePayload);
   } catch(err) {
     console.log(err)
-    res.send({});
+    res.send({"error": err});
   }
 });
 
