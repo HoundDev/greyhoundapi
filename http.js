@@ -371,6 +371,25 @@ async function getCachedTl(orderType){
   })
 }
 
+
+app.use("/api/getnftsData", async function (req, res, next) {
+  try {
+      console.log("Requesting...");
+      let id = req.query.id;
+      console.log(id);
+      let url = `https://api.sologenic.org/api/v1/nft-marketplace/nfts/${id}`;
+      let response = await requestify.get(url);
+      console.log(response.body);
+      res.set('Access-Control-Allow-Origin', '*');
+      // res.send({ "msg": data });
+      res.send({"msg" : response.body})
+  } catch(err) {
+    console.log(err)
+    res.set('Access-Control-Allow-Origin', '*');
+    res.send({});
+  }
+});
+
 //Rate Limiting
 const apiLimiter = rateLimit({
 	windowMs: 1 * 60 * 1000, // 1 minutes
