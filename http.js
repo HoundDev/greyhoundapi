@@ -379,10 +379,10 @@ app.use("/api/getnftsData", async function (req, res, next) {
       console.log(id);
       let url = `https://api.sologenic.org/api/v1/nft-marketplace/nfts/${id}`;
       let response = await axios.get(url);
-      console.log(response.body);
+      // console.log(response.data);
       res.set('Access-Control-Allow-Origin', '*');
       // res.send({ "msg": data });
-      res.send({"msg" : response.body})
+      res.send({"msg" : response.data})
   } catch(err) {
     console.log(err)
     res.set('Access-Control-Allow-Origin', '*');
