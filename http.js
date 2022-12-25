@@ -33,6 +33,7 @@ app.use(bodyParser.json());
 var db;
 var storage;
 var xrplHelper;
+let cache = new Map();
 
 xrplHelper = new XrplHelpers();
 if (!fs.existsSync("./storage.db")) {
@@ -185,13 +186,104 @@ app.use("/api/mainData", async function (req, res, next) {
   }
 });
 
+function convertHexToStr(hex) {
+  var str = '';
+  for (var i = 0; i < hex.length; i += 2)
+      str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+  return str;
+}
+
+async function getNftImage(id,uri) {
+  if(cache.has(id)) {
+    return cache.get(id);
+  }
+
+  if (uri !== "" && uri !== undefined) {
+      //convert the hex string to a string
+      uri = convertHexToStr(uri);
+      if (uri.includes("ipfs://")) {
+          uri = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
+      }
+      //get the image from the URI
+      let response = await axios.get(uri);
+      let data = response.data;
+      //find a field named image
+      let image = data.image;
+      let name = data.name;
+      //return the image
+      if (image === undefined || image === "") {
+          try {
+	          let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
+	          let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
+            let response = await axios.get(onTheDex);
+            let data = response.data;
+            let name = data.name;
+            cache.set(id, {image: imageUrl, name: name});
+            return {image: imageUrl, name: name};
+          } catch (error) {
+            console.log('skipping')
+          }
+      }
+      if (image !== undefined)  {
+      if (image.includes("ipfs://")) {
+        image = image.replace("ipfs://", "https://ipfs.io/ipfs/");
+      }}
+      cache.set(id, {image: image, name: name});
+      return {image: image, name: name};
+  }
+  else {
+        try {
+	      console.log("on the dex api")
+	      let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
+	      let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
+	      let response = await axios.get(onTheDex);
+	      let data = await response.data;
+	      let name = data.name;
+	      cache.set(id, {image: imageUrl, name: name});
+	      return {image: imageUrl, name: name};
+      } catch (error) {
+        console.log('skipping')
+      }
+  }
+}
+
+async function getNftImagesParallel(ids,uris)
+{
+  let promises = [];
+  for (let i = 0; i < ids.length; i++) {
+      promises.push(getNftImage(ids[i],uris[i]));
+  }
+  let results = await Promise.all(promises);
+  return results;
+}
+
 app.use("/api/getnfts", async function (req, res, next) {
   try {
     const client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
     let nfts = await xrplHelper.getAccountNFTs(client, req.body.xrpAddress);
     await client.disconnect();
-    res.send(nfts);
+    let numNfts = nfts.account_nfts.length;
+    nfts = nfts.account_nfts;
+    let nftDict = {};
+    let ids = [];
+    let uris = [];
+    for (let i = 0; i < numNfts; i++) {
+      let nft = nfts[i];
+      let nftId = nft.NFTokenID;
+      let nftTaxon = nft.NFTokenTaxon;
+      let issuer = nft.Issuer;
+      nftDict[nftId] = {taxon: nftTaxon, issuer: issuer};
+      ids.push(nftId);
+      uris.push(nft.URI);
+    }
+    let images = await getNftImagesParallel(ids,uris);
+    for (let i = 0; i < numNfts; i++) {
+      nftDict[ids[i]].image = images[i].image;
+      nftDict[ids[i]].name = images[i].name;
+    }
+    console.log(nftDict);
+    res.send(nftDict);
   } catch(err) {
     console.log(err)
     res.send({});
