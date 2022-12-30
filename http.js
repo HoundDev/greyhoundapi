@@ -17,7 +17,7 @@ const e = require("express");
 const paginate = require("jw-paginate");
 require("dotenv").config();
 const axios = require('axios');
-
+const { parse } = require('csv-parse');
 
 // Create Express Server
 const app = express();
@@ -132,18 +132,6 @@ app.use("/api/mainData", async function (req, res, next) {
   try {
     const client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
-    // let GreyHoundAmount = await storage.selectGreyHoundSum(db);
-    // let tierLevel = await storage.selectTier(db, req.body.xrpAddress);
-    // let transactions = await xrplHelper.getAccountTransactions(client,req.body.xrpAddress);
-    // let account_info = await xrplHelper.getAccountLines(client,process.env.GREYHOUND_ISSUER);
-    // let account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
-    // let xrp_balance = await xrplHelper.getBalance(client,req.body.xrpAddress);
-    // let tx_fees = await xrplHelper.getTransactionFee(client);
-    // let xrpprices = await xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq');
-    // let ghprices = await xrplHelper.getTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
-    // let curGh = await xrplHelper.getLiveTokenPrice('Greyhound.rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ', 'XRP');
-    // let curXrp = await xrplHelper.getLiveXrpPrice();
-    // get all data in parallel
     const [GreyHoundAmount, tierLevel, transactions, account_info, account_lines, xrp_balance, tx_fees, xrpprices, ghprices, curGh, curXrp] = await Promise.all([
       storage.selectGreyHoundSum(db),
       storage.selectTier(db, req.body.xrpAddress),
@@ -354,6 +342,86 @@ app.use("/api/notifs", async function (req, res, next) {
     res.send({success: false});
   }
 });
+
+app.use("/api/getNft", async function (req, res, next) {
+   try {
+      let nfts = await getNftOffs(req.body.address);
+      res.send(nfts);
+   } catch (error) {
+      console.log(error);
+      res.send({});
+   }
+});
+
+async function getNftOffs(address)
+{
+  const issuer = "ritocxA5vs48jvkLXJt9BrgbV6YCrEMfw";
+  const client = new xrpl.Client(process.env.XRPL_RPC);
+  await client.connect();
+  let payload = {
+    command: "account_nfts",
+    account: issuer,
+    ledger_index: "validated",
+    limit: 400
+  };
+  let dataDict = {};
+
+  while (true) {
+    let data = await client.request(payload);
+    let nfts = data.result.account_nfts;
+    for (let i = 0; i < nfts.length; i++) {
+      let nft = nfts[i];
+      let nftId = nft.NFTokenID;
+      let nftTaxon = nft.NFTokenTaxon;
+      let nftIssuer = nft.Issuer;
+      let nftURI = nft.URI;
+      if (nftIssuer == issuer)
+      {
+        dataDict[nftId] = {taxon: nftTaxon, uri: nftURI};
+      }
+    }
+    if (data.result.marker == undefined) {
+      break;
+    }
+    payload.marker = data.result.marker;
+  }
+  console.log(dataDict);
+
+  let nftIds = Object.keys(dataDict);
+  let offers = {};
+  for (let i = 0; i < nftIds.length; i++) {
+    let nftId = nftIds[i];
+    let payload = {
+      command: "nft_sell_offers",
+      nft_id: nftId,
+      ledger_index: "validated",
+      limit: 400
+    };
+    let data = await client.request(payload);
+    let nftOffers = data.result.offers;
+    for (let j = 0; j < nftOffers.length; j++) {
+      let offer = nftOffers[j];
+      let dest = offer.destination;
+      let index = offer.nft_offer_index;
+      if (dest == address) {
+        offers[nftId] = {index: index};
+      }
+    }
+  }
+
+  console.log(offers);
+
+  let nftDict = {};
+  for (let i = 0; i < nftIds.length; i++) {
+    let nftId = nftIds[i];
+    if (nftId in offers) {
+      nftDict[nftId] = {taxon: dataDict[nftId].taxon, uri: dataDict[nftId].uri, index: offers[nftId].index};
+    }
+  }
+
+  let len = Object.keys(nftDict).length;
+  return {nfts: nftDict, len: len};  
+}
 
 async function getBalanceChange(address) {
   const client = new xrpl.Client('wss://xrplcluster.com');
