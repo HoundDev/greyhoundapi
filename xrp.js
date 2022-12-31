@@ -47,13 +47,25 @@ try {
   }
 
   async getAccountNFTs(client, xrpAddress) {
-    const response = await client.request({
-      command: "account_nfts",
-      account: xrpAddress,
-      ledger_index: "validated",
-    });
-    return response.result;
+    let account_nfts = [];
+    while (true) {
+      let payload = {
+        command: "account_nfts",
+        account: "ritocxA5vs48jvkLXJt9BrgbV6YCrEMfw",
+        ledger_index: "validated"
+      }
+      let response = await client.request(payload);
+      account_nfts.push(...response.result.account_nfts);
+      if ('marker' in response.result) {
+        payload.marker = response.result.marker;
+      }
+      else {
+        break;
+    }
+    }
+    return account_nfts;
   }
+
 
   async getAccountTransactions(client,xrpAddress){
     const response = await client.request({

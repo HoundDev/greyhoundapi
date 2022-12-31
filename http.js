@@ -55,6 +55,7 @@ app.use("/xumm/createpayload", async function (req, res, next) {
       process.env.XUMM_API_SECRET
     );
     const payload = await Sdk.payload.create(req.body, true);
+    console.log(payload);
     res.send(payload);
   } catch (err) {
     console.log(err);
@@ -270,7 +271,6 @@ app.use("/api/getnfts", async function (req, res, next) {
       nftDict[ids[i]].image = images[i].image;
       nftDict[ids[i]].name = images[i].name;
     }
-    console.log(nftDict);
     res.send(nftDict);
   } catch(err) {
     console.log(err)
@@ -385,8 +385,6 @@ async function getNftOffs(address)
     }
     payload.marker = data.result.marker;
   }
-  console.log(dataDict);
-
   let nftIds = Object.keys(dataDict);
   let offers = {};
   for (let i = 0; i < nftIds.length; i++) {
@@ -409,7 +407,6 @@ async function getNftOffs(address)
     }
   }
 
-  console.log(offers);
 
   let nftDict = {};
   for (let i = 0; i < nftIds.length; i++) {
@@ -534,15 +531,39 @@ async function getCachedTl(orderType){
 
 app.use("/api/getnftsData", async function (req, res, next) {
   try {
-      console.log("Requesting...");
-      let id = req.query.id;
-      console.log(id);
-      let url = `https://api.sologenic.org/api/v1/nft-marketplace/nfts/${id}`;
-      let response = await axios.get(url);
-      // console.log(response.data);
-      res.set('Access-Control-Allow-Origin', '*');
-      // res.send({ "msg": data });
-      res.send({"msg" : response.data})
+    let nftId = req.body.id;
+    let address = req.body.address;
+    let client = new xrpl.Client(process.env.XRPL_RPC);
+    await client.connect();
+    let nfts = await xrplHelper.getAccountNFTs(client, address);
+    for (let i = 0; i < nfts.length; i++) {
+      let nft = nfts[i];
+      console.log(nft);
+      if (nft.NFTokenID === nftId) {
+        let uri = nft.URI;
+        uri = convertHexToStr(uri);
+        uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
+        let dataDict = await axios.get(uri);
+        let image = dataDict.data.image;
+        let name = dataDict.data.name;
+        let description = dataDict.data.description;
+        let attributes = dataDict.data.attributes;
+        let collection = dataDict.data.collection.name;
+        let nftDataDict = {
+          "image": image,
+          "name": name,
+          "attributes": attributes,
+          "owner": address,
+          "collection":{
+            "name": collection,
+            "description": description
+          }
+        }
+        res.set('Access-Control-Allow-Origin', '*');
+        res.send(nftDataDict);
+      }
+    }
+    
   } catch(err) {
     console.log(err)
     res.set('Access-Control-Allow-Origin', '*');
