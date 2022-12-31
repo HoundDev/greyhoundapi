@@ -51,7 +51,7 @@ try {
     while (true) {
       let payload = {
         command: "account_nfts",
-        account: "ritocxA5vs48jvkLXJt9BrgbV6YCrEMfw",
+        account:xrpAddress,
         ledger_index: "validated"
       }
       let response = await client.request(payload);

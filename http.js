@@ -393,9 +393,14 @@ async function getNftOffs(address)
       command: "nft_sell_offers",
       nft_id: nftId,
       ledger_index: "validated",
-      limit: 400
     };
-    let data = await client.request(payload);
+    // let data = await client.request(payload);
+    try {
+      var data = await client.request(payload);
+    } catch (error) {
+      // console.log(error);
+      continue;
+    }
     let nftOffers = data.result.offers;
     for (let j = 0; j < nftOffers.length; j++) {
       let offer = nftOffers[j];
@@ -406,8 +411,6 @@ async function getNftOffs(address)
       }
     }
   }
-
-
   let nftDict = {};
   for (let i = 0; i < nftIds.length; i++) {
     let nftId = nftIds[i];
@@ -548,7 +551,7 @@ app.use("/api/getnftsData", async function (req, res, next) {
         let name = dataDict.data.name;
         let description = dataDict.data.description;
         let attributes = dataDict.data.attributes;
-        let collection = dataDict.data.collection.name;
+        let collection = dataDict.data.collection.family;
         let nftDataDict = {
           "image": image,
           "name": name,
@@ -559,6 +562,7 @@ app.use("/api/getnftsData", async function (req, res, next) {
             "description": description
           }
         }
+        console.log(nftDataDict);
         res.set('Access-Control-Allow-Origin', '*');
         res.send(nftDataDict);
       }
