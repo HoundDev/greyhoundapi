@@ -355,7 +355,7 @@ app.use("/api/getNft", async function (req, res, next) {
 
 async function getNftOffs(address)
 {
-  const issuer = "ritocxA5vs48jvkLXJt9BrgbV6YCrEMfw";
+  const issuer = "rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW";
   const client = new xrpl.Client(process.env.XRPL_RPC);
   await client.connect();
   let payload = {
