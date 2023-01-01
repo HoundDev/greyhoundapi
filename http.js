@@ -229,8 +229,10 @@ async function getNftImage(id,uri) {
 	      let response = await axios.get(onTheDex);
 	      let data = await response.data;
 	      let name = data.name;
-	      cache.set(id, {image: imageUrl, name: name});
-	      return {image: imageUrl, name: name};
+        let attr = data.attributes;
+        let coll = data.collection;
+	      cache.set(id, {image: imageUrl, name: name, attributes: attr, collection: coll});
+	      return {image: imageUrl, name: name, attributes: attr, collection: coll};
       } catch (error) {
         console.log('skipping')
       }
@@ -541,8 +543,6 @@ app.use("/api/getnftsData", async function (req, res, next) {
       res.send(cacheURIDATA[nftId]);
     } else {
 
-      
-
     let address = req.body.address;
     let client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
@@ -552,6 +552,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
       // console.log(nft);
       if (nft.NFTokenID === nftId) {
         let uri = nft.URI;
+        console.log(uri);
+        if (uri !== undefined) {
         uri = convertHexToStr(uri);
         uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
         let dataDict = await axios.get(uri);
@@ -575,14 +577,30 @@ app.use("/api/getnftsData", async function (req, res, next) {
         cacheURIDATA[nftId] = nftDataDict;
         res.set('Access-Control-Allow-Origin', '*');
         res.send(nftDataDict);
+        } else {
+          // res.send("No URI")
+          let nftData = await getNftImage(nftId,undefined);
+          res.set('Access-Control-Allow-Origin', '*');
+          let nftDataDict = {
+            "image": nftData.image,
+            "name": nftData.name,
+            "attributes": nftData.attributes,
+            "owner": address,
+            "collection":{
+              "name": nftData.collection.name,
+              "description": nftData.collection.description
+            }
+          }
+          cacheURIDATA[nftId] = nftDataDict;
+          res.send(nftDataDict);
+        }
       }
     }
+    client.disconnect();
   }
-    
-  } catch(err) {
-    console.log(err)
-    res.set('Access-Control-Allow-Origin', '*');
-    res.send({});
+  } catch (err) {
+    console.log(err);
+    res.send(err);
   }
 });
 
