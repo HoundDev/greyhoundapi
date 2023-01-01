@@ -534,6 +534,20 @@ async function getCachedTl(orderType){
   })
 }
 
+async function checkEligible(address){
+  //open the AirdropFinal.csv file and check if address is in it
+  let eligible = false;
+  let csv = await fs.readFileSync('AirdropFinal.csv', 'utf8');
+  let lines = csv.split(' ');
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].split(',');
+    if (line[1] === address) {
+      eligible = true;
+      break;
+    }
+  }
+  return eligible;
+}
 
 app.use("/api/getnftsData", async function (req, res, next) {
   try {
@@ -598,6 +612,42 @@ app.use("/api/getnftsData", async function (req, res, next) {
     }
     client.disconnect();
   }
+  } catch (err) {
+    console.log(err);
+    res.send(err);
+  }
+});
+
+// app.use("/api/eligible", async function (req, res, next) {
+//   try {
+//     let address = req.body.address;
+//     //check if the address is in the AidropFinal.csv file
+//     let eligible = await checkEligible(address);
+//     res.set('Access-Control-Allow-Origin', '*');
+//     res.send(eligible);
+//   } catch (err) {
+//     console.log(err);
+//     res.send(err);
+//   }
+// });
+
+app.use("/api/eligible", async function (req, res, next) {
+  try {
+    console.log(req.query.address);
+    let address = req.query.address;
+    //check if the address is in the AidropFinal.csv file
+    let eligible = await checkEligible(address);
+    res.set('Access-Control-Allow-Origin', '*');
+    console.log(eligible);
+    // res.send({eligible: eligible});
+    //return 200 if eligible
+    if (eligible) {
+      res.sendStatus(200);
+    }
+    //return 404 if not eligible
+    else {
+      res.sendStatus(404);
+    }
   } catch (err) {
     console.log(err);
     res.send(err);
