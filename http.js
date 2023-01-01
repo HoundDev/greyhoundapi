@@ -33,7 +33,8 @@ app.use(bodyParser.json());
 var db;
 var storage;
 var xrplHelper;
-let cache = new Map();
+var cache = new Map();
+var cacheURIDATA = new Map();
 
 xrplHelper = new XrplHelpers();
 if (!fs.existsSync("./storage.db")) {
@@ -191,7 +192,7 @@ async function getNftImage(id,uri) {
       //convert the hex string to a string
       uri = convertHexToStr(uri);
       if (uri.includes("ipfs://")) {
-          uri = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
+          uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
       }
       //get the image from the URI
       let response = await axios.get(uri);
@@ -215,7 +216,7 @@ async function getNftImage(id,uri) {
       }
       if (image !== undefined)  {
       if (image.includes("ipfs://")) {
-        image = image.replace("ipfs://", "https://ipfs.io/ipfs/");
+        image = image.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
       }}
       cache.set(id, {image: image, name: name});
       return {image: image, name: name};
@@ -252,8 +253,8 @@ app.use("/api/getnfts", async function (req, res, next) {
     await client.connect();
     let nfts = await xrplHelper.getAccountNFTs(client, req.body.xrpAddress);
     await client.disconnect();
-    let numNfts = nfts.account_nfts.length;
-    nfts = nfts.account_nfts;
+    let numNfts = nfts.length;
+    nfts = nfts;
     let nftDict = {};
     let ids = [];
     let uris = [];
@@ -285,7 +286,7 @@ app.use("/api/registerUser", async function (req, res, next) {
     if (user != undefined)
     {
       res.send({success: false, message: "User already exists"});
-      console.log("User already exists");
+      // console.log("User already exists");
       return;
     }
     let tierLevel = await storage.selectTier(db, req.body.address);
@@ -430,7 +431,7 @@ async function getBalanceChange(address) {
   let URL = 'https://s1.xrplmeta.org/ledger?time=' + time30dayBefore;
   let response = await axios.get(URL);
   let ledger = response.data.sequence;
-  console.log(ledger);
+  // console.log(ledger);
   await client.connect();
   const account = await client.request({
     command: 'account_lines',
@@ -535,13 +536,20 @@ async function getCachedTl(orderType){
 app.use("/api/getnftsData", async function (req, res, next) {
   try {
     let nftId = req.body.id;
+    //check if nft is in cache
+    if (nftId in cacheURIDATA) {
+      res.send(cacheURIDATA[nftId]);
+    } else {
+
+      
+
     let address = req.body.address;
     let client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
     let nfts = await xrplHelper.getAccountNFTs(client, address);
     for (let i = 0; i < nfts.length; i++) {
       let nft = nfts[i];
-      console.log(nft);
+      // console.log(nft);
       if (nft.NFTokenID === nftId) {
         let uri = nft.URI;
         uri = convertHexToStr(uri);
@@ -562,11 +570,14 @@ app.use("/api/getnftsData", async function (req, res, next) {
             "description": description
           }
         }
-        console.log(nftDataDict);
+        client.disconnect();
+        // console.log(nftDataDict);
+        cacheURIDATA[nftId] = nftDataDict;
         res.set('Access-Control-Allow-Origin', '*');
         res.send(nftDataDict);
       }
     }
+  }
     
   } catch(err) {
     console.log(err)
