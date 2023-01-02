@@ -348,7 +348,7 @@ app.use("/api/notifs", async function (req, res, next) {
 
 app.use("/api/getNft", async function (req, res, next) {
    try {
-      console.log("getting nft")
+      console.log("getting nft" + req.body.address);
       let nfts = await getNftOffs(req.body.address);
       console.log(nfts);
       res.send(nfts);
@@ -370,7 +370,6 @@ async function getNftOffs(address)
     limit: 400
   };
   let dataDict = {};
-
   while (true) {
     let data = await client.request(payload);
     let nfts = data.result.account_nfts;
@@ -401,36 +400,14 @@ async function getNftOffs(address)
       ledger_index: "validated",
     };
     promises.push(payload);
-    // // let data = await client.request(payload);
-    // try {
-    //   var data = await client.request(payload);
-    // } catch (error) {
-    //   console.log(error);
-    //   continue;
-    // }
-    // let nftOffers = data.result.offers;
-    // for (let j = 0; j < nftOffers.length; j++) {
-    //   let offer = nftOffers[j];
-    //   let dest = offer.destination;
-    //   let index = offer.nft_offer_index;
-    //   if (dest == address) {
-    //     offers[nftId] = {index: index};
-    //   }
-    // }
   }
 
-  //make all the requests in parallel
-  // let results = await Promise.all(promises.map(payload => client.request(payload)));
-  //continue if there is an error
   let results = await Promise.allSettled(promises.map(payload => client.request(payload)));
   for (let i = 0; i < results.length; i++) {
     let data = results[i];
     if (data.status == "rejected") {
       continue;
     }
-    console.log(data);
-    console.log(data.value.result.offers);
-    // let nftOffers = data.result.offers;
     try {
       var nftOffers = data.value.result.offers;
     } catch (error) {
@@ -446,7 +423,6 @@ async function getNftOffs(address)
       }
     }
   }
-  console.log(offers);
   let nftDict = {};
   for (let i = 0; i < nftIds.length; i++) {
     let nftId = nftIds[i];
@@ -581,6 +557,69 @@ async function checkEligible(address){
   return eligible;
 }
 
+async function checkRarity(attributes) { 
+    try {
+      let URL = "https://bafybeigfu3gqvea75rercpqdyjjs2lnuoyh66mz2rjijrtd7zqfux2wjve.ipfs.w3s.link/traits.json"
+      // [
+      //   {
+      //     "label":"1 of 1",
+      //     "count":10000,
+      //     "traits":[
+      //       {
+      //         "label":"Golden Keyblade",
+      //         "count":1,
+      //         "percentage":0.01,
+      //         "cumulative":0.01,
+      //         "score":10000,
+      //         "weight":100000,
+      //         "tier":"Secret"
+      //       }
+      //    },
+      // {
+      //   "label":"Background",
+      //   "count":10000,
+      //   "traits":[
+      //     {
+      //       "label":"Secret",
+      //       "count":7,
+      //       "percentage":0.07,
+      //       "cumulative":0.07,
+      //       "score":1428.57,
+      //       "weight":10000,
+      //       "tier":"Legendary"
+      //     },
+      //     {
+      //       "label":"Gold",
+      //       "count":67,
+      //       "percentage":0.67,
+      //       "cumulative":0.74,
+      //       "score":149.25,
+      //       "weight":10000,
+      //       "tier":"Legendary"
+      //     }
+      // Example of how to get the rarity of a specific attribute
+      let response = await axios.get(URL);
+      let attributesNew = [];
+      for (let i = 0; i < attributes.length; i++) {
+        let attribute = attributes[i];
+        let attributeNew = attribute;
+        let trait = response.data.find(trait => trait.label === attribute.trait_type);
+        if (trait) {
+          let traitValue = trait.traits.find(traitValue => traitValue.label === attribute.value);
+          if (traitValue) {
+            attributeNew.per = traitValue.percentage;
+          }
+        }
+        attributesNew.push(attributeNew);
+      }
+
+      return attributesNew;
+      
+    } catch (error) {
+      console.log(error);
+    }
+}
+
 app.use("/api/getnftsData", async function (req, res, next) {
   try {
     let nftId = req.body.id;
@@ -607,7 +646,14 @@ app.use("/api/getnftsData", async function (req, res, next) {
         let name = dataDict.data.name;
         let description = dataDict.data.description;
         let attributes = dataDict.data.attributes;
+        attributes = await checkRarity(attributes);
         let collection = dataDict.data.collection.family;
+        let rarity = dataDict.data.rarity;
+        let tierNFT = dataDict.data.tier;
+        let anim = dataDict.data.animation;
+        if (anim !== undefined) {
+          image = anim;
+        }
         let nftDataDict = {
           "image": image,
           "name": name,
@@ -616,8 +662,11 @@ app.use("/api/getnftsData", async function (req, res, next) {
           "collection":{
             "name": collection,
             "description": description
-          }
+          },
+          "rarity": rarity,
+          "tier": tierNFT
         }
+        console.log(nftDataDict);
         client.disconnect();
         // console.log(nftDataDict);
         cacheURIDATA[nftId] = nftDataDict;
@@ -649,19 +698,6 @@ app.use("/api/getnftsData", async function (req, res, next) {
     res.send({error: err});
   }
 });
-
-// app.use("/api/eligible", async function (req, res, next) {
-//   try {
-//     let address = req.body.address;
-//     //check if the address is in the AidropFinal.csv file
-//     let eligible = await checkEligible(address);
-//     res.set('Access-Control-Allow-Origin', '*');
-//     res.send(eligible);
-//   } catch (err) {
-//     console.log(err);
-//     res.send(err);
-//   }
-// });
 
 app.use("/api/eligible", async function (req, res, next) {
   try {
