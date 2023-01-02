@@ -348,7 +348,9 @@ app.use("/api/notifs", async function (req, res, next) {
 
 app.use("/api/getNft", async function (req, res, next) {
    try {
+      console.log("getting nft")
       let nfts = await getNftOffs(req.body.address);
+      console.log(nfts);
       res.send(nfts);
    } catch (error) {
       console.log(error);
@@ -364,7 +366,7 @@ async function getNftOffs(address)
   let payload = {
     command: "account_nfts",
     account: issuer,
-    ledger_index: "validated",
+    ledger_index: "current",
     limit: 400
   };
   let dataDict = {};
@@ -390,6 +392,7 @@ async function getNftOffs(address)
   }
   let nftIds = Object.keys(dataDict);
   let offers = {};
+  let promises = [];
   for (let i = 0; i < nftIds.length; i++) {
     let nftId = nftIds[i];
     let payload = {
@@ -397,23 +400,53 @@ async function getNftOffs(address)
       nft_id: nftId,
       ledger_index: "validated",
     };
-    // let data = await client.request(payload);
-    try {
-      var data = await client.request(payload);
-    } catch (error) {
-      // console.log(error);
+    promises.push(payload);
+    // // let data = await client.request(payload);
+    // try {
+    //   var data = await client.request(payload);
+    // } catch (error) {
+    //   console.log(error);
+    //   continue;
+    // }
+    // let nftOffers = data.result.offers;
+    // for (let j = 0; j < nftOffers.length; j++) {
+    //   let offer = nftOffers[j];
+    //   let dest = offer.destination;
+    //   let index = offer.nft_offer_index;
+    //   if (dest == address) {
+    //     offers[nftId] = {index: index};
+    //   }
+    // }
+  }
+
+  //make all the requests in parallel
+  // let results = await Promise.all(promises.map(payload => client.request(payload)));
+  //continue if there is an error
+  let results = await Promise.allSettled(promises.map(payload => client.request(payload)));
+  for (let i = 0; i < results.length; i++) {
+    let data = results[i];
+    if (data.status == "rejected") {
       continue;
     }
-    let nftOffers = data.result.offers;
+    console.log(data);
+    console.log(data.value.result.offers);
+    // let nftOffers = data.result.offers;
+    try {
+      var nftOffers = data.value.result.offers;
+    } catch (error) {
+      console.log(error);
+      continue;
+    }
     for (let j = 0; j < nftOffers.length; j++) {
       let offer = nftOffers[j];
       let dest = offer.destination;
       let index = offer.nft_offer_index;
       if (dest == address) {
-        offers[nftId] = {index: index};
+        offers[nftIds[i]] = {index: index};
       }
     }
   }
+  console.log(offers);
   let nftDict = {};
   for (let i = 0; i < nftIds.length; i++) {
     let nftId = nftIds[i];
