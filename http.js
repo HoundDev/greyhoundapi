@@ -651,8 +651,10 @@ app.use("/api/getnftsData", async function (req, res, next) {
         let rarity = dataDict.data.rarity;
         let tierNFT = dataDict.data.tier;
         let anim = dataDict.data.animation;
+        let animFlag = false
         if (anim !== undefined) {
           image = anim;
+          animFlag = true;
         }
         let nftDataDict = {
           "image": image,
@@ -664,7 +666,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
             "description": description
           },
           "rarity": rarity,
-          "tier": tierNFT
+          "tier": tierNFT,
+          "anim": animFlag
         }
         console.log(nftDataDict);
         client.disconnect();
