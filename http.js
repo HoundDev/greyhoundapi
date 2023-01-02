@@ -277,7 +277,7 @@ app.use("/api/getnfts", async function (req, res, next) {
     res.send(nftDict);
   } catch(err) {
     console.log(err)
-    res.send({});
+    res.send({"error": err});
   }
 });
 
@@ -352,7 +352,7 @@ app.use("/api/getNft", async function (req, res, next) {
       res.send(nfts);
    } catch (error) {
       console.log(error);
-      res.send({});
+      res.send({"error": error});
    }
 });
 
@@ -501,7 +501,6 @@ async function getNotifs() {
   })
 }
 
-
 async function getCachedOrders(orderType) {
   return new Promise((resolve, reject) => {
     fs.readFile("../.dashboard.cache/buy_sell_data.json", "utf8", (err, jsonString) => {
@@ -614,7 +613,7 @@ app.use("/api/getnftsData", async function (req, res, next) {
   }
   } catch (err) {
     console.log(err);
-    res.send(err);
+    res.send({error: err});
   }
 });
 
