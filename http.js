@@ -669,7 +669,6 @@ app.use("/api/getnftsData", async function (req, res, next) {
           "tier": tierNFT,
           "anim": animFlag
         }
-        console.log(nftDataDict);
         client.disconnect();
         // console.log(nftDataDict);
         cacheURIDATA[nftId] = nftDataDict;
