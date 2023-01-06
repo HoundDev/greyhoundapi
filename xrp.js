@@ -47,21 +47,27 @@ try {
   }
 
   async getAccountNFTs(client, xrpAddress) {
+    console.log("Getting NFTs for " + xrpAddress);
     let account_nfts = [];
+    var marker = null;
     while (true) {
-      let payload = {
+      var payload = {
         command: "account_nfts",
         account:xrpAddress,
-        ledger_index: "validated"
+        ledger_index: "validated",
+        limit: 400
+      }
+      if (marker) {
+        payload.marker = marker;
       }
       let response = await client.request(payload);
       account_nfts.push(...response.result.account_nfts);
-      if ('marker' in response.result) {
-        payload.marker = response.result.marker;
-      }
-      else {
+      console.log("Response length: " + response.result);
+      if (response.result.marker) {
+        marker = response.result.marker;
+      } else {
         break;
-    }
+      }
     }
     return account_nfts;
   }

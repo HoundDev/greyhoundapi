@@ -195,7 +195,12 @@ async function getNftImage(id,uri) {
           uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
       }
       //get the image from the URI
-      let response = await axios.get(uri);
+      try{
+        var response = await axios.get(uri);
+      } catch (error) {
+        console.log('skipping')
+        return {image: "", name: ""};
+      }
       let data = response.data;
       //find a field named image
       let image = data.image;
@@ -384,10 +389,13 @@ async function getNftOffs(address)
         dataDict[nftId] = {taxon: nftTaxon, uri: nftURI};
       }
     }
-    if (data.result.marker == undefined) {
+    if('marker' in data.result) {
+      payload.marker = data.result.marker;
+    }
+    else {
       break;
     }
-    payload.marker = data.result.marker;
+    console.log(nfts);
   }
   let nftIds = Object.keys(dataDict);
   let offers = {};
