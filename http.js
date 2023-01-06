@@ -637,7 +637,7 @@ app.use("/api/getnftsData", async function (req, res, next) {
       // console.log(nft);
       if (nft.NFTokenID === nftId) {
         let uri = nft.URI;
-        console.log(uri);
+        let taxon = nft.NFTokenTaxon;
         if (uri !== undefined) {
         uri = convertHexToStr(uri);
         uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
@@ -667,7 +667,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
           },
           "rarity": rarity,
           "tier": tierNFT,
-          "anim": animFlag
+          "anim": animFlag,
+          "taxon": taxon
         }
         client.disconnect();
         // console.log(nftDataDict);
