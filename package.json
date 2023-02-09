@@ -17,6 +17,7 @@
     "http-proxy-middleware": "^2.0.4",
     "https": "^1.0.0",
     "jw-paginate": "^1.0.4",
+    "mariadb": "^3.0.2",
     "moment": "^2.29.3",
     "mongodb": "^4.11.0",
     "path": "^0.12.7",

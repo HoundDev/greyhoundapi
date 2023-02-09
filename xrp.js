@@ -9,21 +9,31 @@ class XrplHelpers {
       const response = await axios.get('https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=' + quote + '&bars=30&interval=D&tf=ISO');
       let body       = response['data'];
       let prices     = [];
-
-      for (var i = 0; i < 30; i++) {
-        prices.push(body.data.ohlc[i].c);
+      if ('error' in body) {
+        return 0;
+      }
+      for (var i = 0; i < body.data['ohlc'].length; i++) {
+        prices.push(body.data['ohlc'][i].c);
       }
       return prices;
     } catch (error) {
       console.error(error);
+      return 0;
     }
   }
 
   async getLiveTokenPrice(base){
-  const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
-  const response = await axios.get(url);
-  console.log(response.data.data.ohlc[0].c);
-  return response.data.data['ohlc'][response.data.data['ohlc'].length - 1].c;
+try {
+      const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
+      const response = await axios.get(url);
+      if ('error' in response.data) {
+        return 0;
+      }
+      return response.data.data['ohlc'][response.data.data['ohlc'].length - 1].c;
+} catch (error) {
+      console.error(error);
+      return 0;
+}
   }
 
   async getLiveXrpPrice() {
