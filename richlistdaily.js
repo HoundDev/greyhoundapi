@@ -34,7 +34,7 @@ const accountLinesRequest = {
   }
 
 async function main() {
-    const client = new xrpl.Client("wss://s1.ripple.com");
+    const client = new xrpl.Client(process.env.XRPL_RPC);
     var storage = new Storage();
     var db = storage.getInstance();
   try {
