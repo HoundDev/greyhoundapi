@@ -215,7 +215,7 @@ function getDb() {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: "greyhounds"
+    database: process.env.DB_SCHEMA
   });
 }
 
@@ -487,7 +487,7 @@ async function getNftOffs(address)
 }
 
 async function getBalanceChange(address) {
-  const client = new xrpl.Client('wss://xrplcluster.com');
+  const client = new xrpl.Client(process.env.XRPL_RPC);
   const time = Math.floor(Date.now() / 1000);
   let time30dayBefore = time - 2592000;
   let URL = 'https://s1.xrplmeta.org/ledger?time=' + time30dayBefore;
