@@ -8,6 +8,8 @@ const { XummSdk } = require("xumm-sdk");
 var cors = require("cors");
 const bodyParser = require("body-parser");
 const xrpl = require("xrpl");
+const { XrplClient } = require('xrpl-client')
+const { derive, sign } = require('xrpl-accountlib')
 const rateLimit = require('express-rate-limit');
 const verifySignature = require('verify-xrpl-signature').verifySignature;
 const Storage = require("./storage.js");
@@ -963,22 +965,68 @@ try {
 // }
 // }
 
+// async function mintNft(cid) {
+//   try {
+//     const secret = process.env.WALLET_SECRET;
+//     const client = new xrpl.Client(process.env.XRPL_RPCC);
+//     await client.connect();
+//     const wallet = xrpl.Wallet.fromSeed(secret);
+//     const address = wallet.classicAddress;
+
+//     //prepare transaction
+//     let mint_txn_json = await client.autofill({
+//       TransactionType: "NFTokenMint",
+//       Account: address,
+//       TransferFee: parseInt("5000"),
+//       NFTokenTaxon: 1,
+//       URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
+//       Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
+//       "Memos": [
+//         {
+//           "Memo": {
+//             "MemoType": Buffer.from("NFT", 'utf-8').toString('hex').toUpperCase(),
+//             "MemoData": Buffer.from("NFT From Greyhound Dashboard!", 'utf-8').toString('hex').toUpperCase()
+//           }
+//         }
+//       ]
+//     });
+
+//     //sign transaction
+//     const signed = wallet.sign(mint_txn_json);
+//     console.log("Hash: " + signed.hash);
+
+//     //submit transaction
+//     const tx = await client.submitAndWait(signed.tx_blob);
+//     console.log("Transaction result:", tx.result.meta.TransactionResult)
+    
+//     await client.disconnect();
+
+//     return tx.result.hash;
+//   } catch (error) {
+//     console.log(error);
+//   }
+// }
+
 async function mintNft(cid) {
   try {
-    const secret = process.env.WALLET_SECRET;
-    const client = new xrpl.Client(process.env.XRPL_RPCC);
-    await client.connect();
-    const wallet = xrpl.Wallet.fromSeed(secret);
-    const address = wallet.classicAddress;
+    console.log("Minting NFT: " + cid);
+    const client = new XrplClient(process.env.XRPL_RPCC);
+    const wallet = derive.familySeed(process.env.WALLET_SECRET);
+    const address = wallet.address;
+    const client2 = new xrpl.Client(process.env.XRPL_RPCC);
+    await client2.connect();
+    const req = await client2.request({ command: 'account_info', account: address })
+    const sequence = req.result.account_data.Sequence;
 
-    //prepare transaction
-    let mint_txn_json = await client.autofill({
-      TransactionType: "NFTokenMint",
+    const mintTransaction = {
+      TransactionType: 'NFTokenMint',
       Account: address,
       TransferFee: parseInt("5000"),
       NFTokenTaxon: 1,
       URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
+      Fee: "300",
       Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
+      Sequence: sequence,
       "Memos": [
         {
           "Memo": {
@@ -987,21 +1035,26 @@ async function mintNft(cid) {
           }
         }
       ]
-    });
+    }
 
-    //sign transaction
-    const signed = wallet.sign(mint_txn_json);
-    console.log("Hash: " + signed.hash);
+    const signed = sign(mintTransaction, wallet);
+    console.log('Signed transaction: ', signed.signedTransaction)
+    const submit = await client.send(
+      {
+        command: 'submit',
+        tx_blob: signed.signedTransaction
+      }
+    )
 
-    //submit transaction
-    const tx = await client.submitAndWait(signed.tx_blob);
-    console.log("Transaction result:", tx.result.meta.TransactionResult)
+    console.log("Transaction result:", submit)
+    await client2.disconnect();
+    //sleep for 3 seconds
+    await new Promise(r => setTimeout(r, 5000));
+    console.log("Transaction result:", submit.tx_json.hash)
+    return submit.tx_json.hash;
     
-    await client.disconnect();
-
-    return tx.result.hash;
   } catch (error) {
-    console.log(error);
+    
   }
 }
 
