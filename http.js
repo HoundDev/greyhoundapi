@@ -911,6 +911,7 @@ try {
 	  let NFT_id = null;
 	  const encodedURI = submit.result.URI;
 	  submit = submit.result;
+    console.log(submit);
 	  for (let index = 0; index < submit.meta.AffectedNodes.length; index++) {
 	    const affectedNode = submit.meta.AffectedNodes[index];
 	    let nodeToCheck;
@@ -938,8 +939,7 @@ try {
 	  return NFT_id;
 } catch (error) {
 	console.log(error);
-}
-}
+}}
 
 async function mintNft(cid) {
   return new Promise(async (resolve, reject) => {
@@ -982,13 +982,13 @@ async function mintNft(cid) {
       )
 
       const val_ledger = submit.validated_ledger_index;
-      await client2.disconnect();
 
       client.on('ledger', async (ledger) => {
-        if (ledger.ledger_index > val_ledger) {
+        if (ledger.ledger_index > val_ledger+1) {
           console.log("Transaction result:", submit.tx_json.hash)
           resolve(submit.tx_json.hash);
-          client.close()
+          client.close();
+          await client2.disconnect();
         }
       })
 
