@@ -799,7 +799,20 @@ app.get("/mint/pending", async function (req, res, next) {
     } else if (objectR.burnt_id != null && objectR.mint_id == null && objectR.offer_id == null && objectR.claim_id == null) {
       res.send({pending: true, stage: "burnt", request_id: objectR.request_id});
     } else if (objectR.mint_id != null && objectR.offer_id === null && objectR.claim_id === null) {
-      res.send({pending: true, stage: "minted", request_id: objectR.request_id});
+      // res.send({pending: true, stage: "minted", request_id: objectR.request_id});
+      //create offer
+      let hash = await pool.query("SELECT * FROM nfts_requests_transactions WHERE id = ?", [objectR.mint_id]);
+      let nftId = await checkHashMint(hash[0].hash);
+      let offer = await createNftOffer(nftId, address);
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, ?)", [objectR.request_id, offer, Math.floor(Date.now() / 1000)]);
+      pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [objectR.request_id]);
+      let nftNum = await pool.query("SELECT * FROM nfts_requests WHERE id = ?", [objectR.request_id]);
+      nftNum = nftNum[0].nft_id;
+      await updateNftId(parseInt(nftNum-1), nftId);
+      let nftImage = await pool.query("SELECT * FROM nfts WHERE num = ?", [nftNum]);
+      nftImage = nftImage[0].cid;
+      nftImage = await getNftImageFromURL("https://cloudflare-ipfs.com/ipfs/" + nftImage + "/" + nftId + ".json");
+      res.send({pending: true, stage: "offered", request_id: objectR.request_id, offer: offer,nft_name: nftNum,nft_image: nftImage});
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
       let offer = await pool.query("SELECT * FROM nfts_requests_transactions WHERE id = ? AND `action` = 'OFFER'", [objectR.offer_id]);
       let nftId = await pool.query("SELECT * FROM nfts_requests WHERE id = ?", [objectR.request_id]);
@@ -866,7 +879,7 @@ try {
       let offer = await createNftOffer(nftId, address);
       pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, ?)", [pid, offer, Math.floor(Date.now() / 1000)]);
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
-      await updateNftId(rnft.id, nftId);
+      await updateNftId(rnft.id, nftId); //update nft id in db
       res.set('Access-Control-Allow-Origin', '*');
       res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num});
 } catch (error) {
@@ -928,134 +941,63 @@ try {
 }
 }
 
-// async function mintNft(cid) {
-// try {
-// 	  const secret = process.env.WALLET_SECRET;
-// 	  const client = new xrpl.Client(process.env.XRPL_RPC);
-// 	  await client.connect();
-// 	  const wallet = xrpl.Wallet.fromSeed(secret);
-// 	  const address = wallet.classicAddress;
-	
-// 	  let mint_txn_json = {
-// 	    TransactionType: "NFTokenMint",
-// 	    Account: address,
-// 	    TransferFee: parseInt("5000"),
-// 	    NFTokenTaxon: 1,
-// 	    URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
-// 	    Fee: "300",
-// 	    Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
-// 	    "Memos": [
-// 	      {
-// 	        "Memo": {
-// 	          "MemoType": Buffer.from("NFT", 'utf-8').toString('hex').toUpperCase(),
-// 	          "MemoData": Buffer.from("NFT From Greyhound Dashboard!", 'utf-8').toString('hex').toUpperCase()
-// 	        }
-// 	      }
-// 	    ]
-// 	  };
-	
-// 	  const response = await client.submitAndWait(mint_txn_json, {wallet: wallet})
-// 	  console.log(`\nTransaction submitted: ${response.result.hash}`);
-	
-// 	  await client.disconnect();
-	
-// 	  return response.result.hash;
-// } catch (error) {
-// 	console.log(error);
-// }
-// }
-
-// async function mintNft(cid) {
-//   try {
-//     const secret = process.env.WALLET_SECRET;
-//     const client = new xrpl.Client(process.env.XRPL_RPCC);
-//     await client.connect();
-//     const wallet = xrpl.Wallet.fromSeed(secret);
-//     const address = wallet.classicAddress;
-
-//     //prepare transaction
-//     let mint_txn_json = await client.autofill({
-//       TransactionType: "NFTokenMint",
-//       Account: address,
-//       TransferFee: parseInt("5000"),
-//       NFTokenTaxon: 1,
-//       URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
-//       Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
-//       "Memos": [
-//         {
-//           "Memo": {
-//             "MemoType": Buffer.from("NFT", 'utf-8').toString('hex').toUpperCase(),
-//             "MemoData": Buffer.from("NFT From Greyhound Dashboard!", 'utf-8').toString('hex').toUpperCase()
-//           }
-//         }
-//       ]
-//     });
-
-//     //sign transaction
-//     const signed = wallet.sign(mint_txn_json);
-//     console.log("Hash: " + signed.hash);
-
-//     //submit transaction
-//     const tx = await client.submitAndWait(signed.tx_blob);
-//     console.log("Transaction result:", tx.result.meta.TransactionResult)
-    
-//     await client.disconnect();
-
-//     return tx.result.hash;
-//   } catch (error) {
-//     console.log(error);
-//   }
-// }
-
 async function mintNft(cid) {
-  try {
-    console.log("Minting NFT: " + cid);
-    const client = new XrplClient(process.env.XRPL_RPCC);
-    const wallet = derive.familySeed(process.env.WALLET_SECRET);
-    const address = wallet.address;
-    const client2 = new xrpl.Client(process.env.XRPL_RPCC);
-    await client2.connect();
-    const req = await client2.request({ command: 'account_info', account: address })
-    const sequence = req.result.account_data.Sequence;
+  return new Promise(async (resolve, reject) => {
+    try {
+      console.log("Minting NFT: " + cid);
+      const client = new XrplClient(process.env.XRPL_RPCC);
+      const wallet = derive.familySeed(process.env.WALLET_SECRET);
+      const address = wallet.address;
+      const client2 = new xrpl.Client(process.env.XRPL_RPCC);
+      await client2.connect();
+      const req = await client2.request({ command: 'account_info', account: address })
+      const sequence = req.result.account_data.Sequence;
 
-    const mintTransaction = {
-      TransactionType: 'NFTokenMint',
-      Account: address,
-      TransferFee: parseInt("5000"),
-      NFTokenTaxon: 1,
-      URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
-      Fee: "300",
-      Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
-      Sequence: sequence,
-      "Memos": [
-        {
-          "Memo": {
-            "MemoType": Buffer.from("NFT", 'utf-8').toString('hex').toUpperCase(),
-            "MemoData": Buffer.from("NFT From Greyhound Dashboard!", 'utf-8').toString('hex').toUpperCase()
+      const mintTransaction = {
+        TransactionType: 'NFTokenMint',
+        Account: address,
+        TransferFee: parseInt("5000"),
+        NFTokenTaxon: 1,
+        URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
+        Fee: "300",
+        Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
+        Sequence: sequence,
+        "Memos": [
+          {
+            "Memo": {
+              "MemoType": Buffer.from("NFT", 'utf-8').toString('hex').toUpperCase(),
+              "MemoData": Buffer.from("NFT From Greyhound Dashboard!", 'utf-8').toString('hex').toUpperCase()
+            }
           }
-        }
-      ]
-    }
-
-    const signed = sign(mintTransaction, wallet);
-    console.log('Signed transaction: ', signed.signedTransaction)
-    const submit = await client.send(
-      {
-        command: 'submit',
-        tx_blob: signed.signedTransaction
+        ]
       }
-    )
 
-    console.log("Transaction result:", submit)
-    await client2.disconnect();
-    //sleep for 3 seconds
-    await new Promise(r => setTimeout(r, 5000));
-    console.log("Transaction result:", submit.tx_json.hash)
-    return submit.tx_json.hash;
-    
-  } catch (error) {
-    
-  }
+      const signed = sign(mintTransaction, wallet);
+      console.log('Signed transaction: ', signed.signedTransaction)
+      const submit = await client.send(
+        {
+          command: 'submit',
+          tx_blob: signed.signedTransaction
+        }
+      )
+
+      const val_ledger = submit.validated_ledger_index;
+      await client2.disconnect();
+
+      client.on('ledger', async (ledger) => {
+        if (ledger.ledger_index > val_ledger) {
+          console.log("Transaction result:", submit.tx_json.hash)
+          resolve(submit.tx_json.hash);
+          client.close()
+        }
+      })
+
+
+    } catch (error) {
+      console.log(error);
+      reject(error);
+    }
+  })
 }
 
 
