@@ -40,6 +40,7 @@ var xrplHelper;
 var cache = new Map();
 var cacheURIDATA = new Map();
 var priceCache = new Map();
+var currentlyMinting = new Map();
 //update the price cache every 5 minutes
 setInterval(function(){
   if (priceCache.size > 0) {
@@ -812,13 +813,24 @@ const decrypt = (text, password) => {
 app.get("/mint/pending", async function (req, res, next) {
   try {
     let address = req.query.address;
+    if (currentlyMinting.get(address) === true) {
+      res.send({status: "minting"});
+      return;
+    } 
     console.log(`querying for address: ${address}`);
     let pending = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
     console.log(pending[0])
     if (pending[0] === undefined) {
-      await addToDb(address);
+      let addedRow = await addToDb(address);
+      let pid = addedRow.insertId;
+      //it has `n` at the end, so we need to remove it
+      if (pid.toString().endsWith('n')) {
+        pid = pid.toString().slice(0, -1);
+      }
+      console.log(pid);
+      let encrypted = encrypt(`${pid}`, process.env.PASSWORD);
       res.set('Access-Control-Allow-Origin', '*');
-      res.send({pending: true, stage: "pending"})
+      res.send({pending: true, stage: "pending", request_id: encrypted});
       return;
     }
     res.set('Access-Control-Allow-Origin', '*');
@@ -874,6 +886,7 @@ app.post("/mint/burnt", async function (req, res, next) {
     // let pendingg = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
     // pid = pendingg[0].request_id;
     let pid = req.body.pid;
+    console.log(`pid: ${pid}`)
     //decrypt pid
     pid = decrypt(pid, process.env.PASSWORD);
     pid = parseInt(pid);
@@ -899,6 +912,7 @@ app.post("/mint/burnt", async function (req, res, next) {
 app.post("/mint/mint_txn", async function (req, res, next) {
 try {
       let address = req.body.address;
+      currentlyMinting.set(address, true);
       console.log(`updating address: ${address} from burnt to minted`);
       // let pid = 0;
       // let pendingg = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
@@ -909,8 +923,10 @@ try {
       pid = parseInt(pid);
       //add address to db
       let rnft = await getRandomNFT();
+      console.log('random nft: ' + rnft.cid + '/' + rnft.num + '.json')
       let rnfturl = 'https://cloudflare-ipfs.com/ipfs/' + rnft.cid + '/' + rnft.num + '.json';
       const nftImage = await getNftImageFromURL(rnfturl);
+      console.log('nft image: ' + nftImage);
       let cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
       let txnHash = await mintNft(cid)   
       //add hash to db
@@ -923,8 +939,11 @@ try {
       await updateNftId(rnft.id, nftId); //update nft id in db
       res.set('Access-Control-Allow-Origin', '*');
       res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num});
+      //remove from currently minting
+      currentlyMinting.delete(address);
 } catch (error) {
   console.log(error);
+      currentlyMinting.delete(address);
 }
 });
 
@@ -1158,6 +1177,7 @@ async function addToDb(address) {
     let dateAdded = Math.floor(date.getTime() / 1000);
     let pending = await pool.query("INSERT INTO nfts_requests (`nft_id`, `wallet`, `burn_amount`, `date_added`, `status`) VALUES (NULL, ?, ?, ?, ?)", [address, 0, dateAdded, "pending"]);
     console.log("added to db")
+    return pending;
   } catch (error) {
     console.log(error);
   }
