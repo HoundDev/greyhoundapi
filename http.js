@@ -21,6 +21,7 @@ require("dotenv").config();
 const axios = require('axios');
 const { parse } = require('csv-parse');
 let mariadb = require('mariadb');
+const crypto = require('crypto');
 
 // Create Express Server
 const app = express();
@@ -778,6 +779,34 @@ app.use("/api/eligible", async function (req, res, next) {
   }
 });
 
+//encrypt/decrypt
+const encrypt = (text, password) => {
+  if (process.versions.openssl <= '1.0.1f') {
+      throw new Error('OpenSSL Version too old, vulnerability to Heartbleed');
+  }
+  // let iv = crypto.randomBytes(IV_LENGTH);
+  let iv = process.env.IV;
+  iv = Buffer.from(iv, 'utf8');
+  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(password), iv);
+  let encrypted = cipher.update(text);
+
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+const decrypt = (text, password) => {
+  let textParts = text.split(':');
+  
+  let iv = Buffer.from(textParts.shift(), 'hex');
+  let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+
+  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(password), iv);
+  let decrypted = decipher.update(encryptedText);
+
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+}
+
 //minting/db endpoints
 
 app.get("/mint/pending", async function (req, res, next) {
@@ -794,10 +823,14 @@ app.get("/mint/pending", async function (req, res, next) {
     }
     res.set('Access-Control-Allow-Origin', '*');
     let objectR = pending[0];
+    var pid = objectR.request_id;
+    //encrypt pid
+    let encryptedPid = encrypt(`${pid}`, process.env.PASSWORD);
+
     if (objectR.request_id != null && objectR.claim_id == null && objectR.offer_id == null && objectR.mint_id == null && objectR.burnt_id == null) {
-      res.send({pending: true, stage: "pending", request_id: objectR.request_id});
+      res.send({pending: true, stage: "pending", request_id: encryptedPid});
     } else if (objectR.burnt_id != null && objectR.mint_id == null && objectR.offer_id == null && objectR.claim_id == null) {
-      res.send({pending: true, stage: "burnt", request_id: objectR.request_id});
+      res.send({pending: true, stage: "burnt", request_id: encryptedPid});
     } else if (objectR.mint_id != null && objectR.offer_id === null && objectR.claim_id === null) {
       // res.send({pending: true, stage: "minted", request_id: objectR.request_id});
       //create offer
@@ -812,7 +845,7 @@ app.get("/mint/pending", async function (req, res, next) {
       let nftImage = await pool.query("SELECT * FROM nfts WHERE num = ?", [nftNum]);
       nftImage = nftImage[0].cid;
       nftImage = await getNftImageFromURL("https://cloudflare-ipfs.com/ipfs/" + nftImage + "/" + nftId + ".json");
-      res.send({pending: true, stage: "offered", request_id: objectR.request_id, offer: offer,nft_name: nftNum,nft_image: nftImage});
+      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offer,nft_name: nftNum,nft_image: nftImage});
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
       let offer = await pool.query("SELECT * FROM nfts_requests_transactions WHERE id = ? AND `action` = 'OFFER'", [objectR.offer_id]);
       let nftId = await pool.query("SELECT * FROM nfts_requests WHERE id = ?", [objectR.request_id]);
@@ -821,7 +854,7 @@ app.get("/mint/pending", async function (req, res, next) {
       let nftImage = await pool.query("SELECT * FROM nfts WHERE num = ?", [nftId]);
       nftImage = nftImage[0].cid;
       nftImage = await getNftImageFromURL("https://cloudflare-ipfs.com/ipfs/" + nftImage + "/" + nftId + ".json");
-      res.send({pending: true, stage: "offered", request_id: objectR.request_id, offer: offerHash,nft_name: nftId, nft_image: nftImage});
+      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash,nft_name: nftId, nft_image: nftImage});
     } else {
       res.send({pending: false});
     }
@@ -837,9 +870,13 @@ app.post("/mint/burnt", async function (req, res, next) {
     let address = req.body.address;
     let txnHash = req.body.txnHash;
     console.log(`updating address: ${address} from pending to burnt`);
-    let pid = 0;
-    let pendingg = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
-    pid = pendingg[0].request_id;
+    // let pid = 0;
+    // let pendingg = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
+    // pid = pendingg[0].request_id;
+    let pid = req.body.pid;
+    //decrypt pid
+    pid = decrypt(pid, process.env.PASSWORD);
+    pid = parseInt(pid);
     //check if the same params are already in the db
     let pending = await pool.query("SELECT * FROM nfts_requests_transactions WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'BURN' AND hash = ?", [pid, txnHash]);
     if (pending[0] === undefined) {
@@ -863,9 +900,13 @@ app.post("/mint/mint_txn", async function (req, res, next) {
 try {
       let address = req.body.address;
       console.log(`updating address: ${address} from burnt to minted`);
-      let pid = 0;
-      let pendingg = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
-      pid = pendingg[0].request_id;
+      // let pid = 0;
+      // let pendingg = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
+      // pid = pendingg[0].request_id;
+      let pid = req.body.pid;
+      //decrypt pid
+      pid = decrypt(pid, process.env.PASSWORD);
+      pid = parseInt(pid);
       //add address to db
       let rnft = await getRandomNFT();
       let rnfturl = 'https://cloudflare-ipfs.com/ipfs/' + rnft.cid + '/' + rnft.num + '.json';
@@ -890,10 +931,12 @@ try {
 app.post("/mint/claim_txn", async function (req, res, next) {
     let address = req.body.address;
     let hash = req.body.hash;
+    let pid = req.body.pid;
+    //decrypt pid
+    pid = decrypt(pid, process.env.PASSWORD);
+    pid = parseInt(pid);
+
     console.log(`updating address: ${address} from offered to claimed`);
-    let pid = 0;
-    let pendingg = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
-    pid = pendingg[0].request_id;
     //update in nfts_requests to tesSUCCESS
     pool.query("UPDATE nfts_requests SET `status` = 'tesSUCCESS' WHERE id = ?", [pid]);
     //add hash to db
@@ -999,7 +1042,6 @@ async function mintNft(cid) {
     }
   })
 }
-
 
 async function createNftOffer(nftId,dest) {
 try {
