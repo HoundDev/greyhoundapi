@@ -146,6 +146,19 @@ app.use("/api/richlist", async function (req, res, next) {
   } catch {}
 });
 
+app.get("/api/greyhoundBalance", async function (req, res, next) {
+  try {
+    const client = new xrpl.Client(process.env.XRPL_RPC);
+    await client.connect();
+    const greyhoundBalance = await xrplHelper.getAccountLines(client,req.query.address);
+    await client.disconnect();
+    res.send(greyhoundBalance);
+  } catch {
+    console.log("Error getting greyhound balance");
+    res.send("Error getting greyhound balance");
+  }
+});
+
 app.use("/api/mainData", async function (req, res, next) {
   try {
     const client = new xrpl.Client(process.env.XRPL_RPC);
@@ -807,7 +820,6 @@ const decrypt = (text, password) => {
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
 }
-
 //minting/db endpoints
 
 app.get("/mint/pending", async function (req, res, next) {
@@ -963,7 +975,6 @@ app.post("/mint/claim_txn", async function (req, res, next) {
     res.set('Access-Control-Allow-Origin', '*');
     res.send({status: 'tesSUCCESS'});
 });
-
 
 async function checkHashMint(minting_hash) {
 try {
