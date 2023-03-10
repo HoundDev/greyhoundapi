@@ -37,15 +37,20 @@ try {
   }
 
   async getLiveXrpPrice() {
-try {
-	    const url = 'https://api.binance.com/api/v3/ticker/price?symbol=XRPUSDT';
+  try {
+	    const url = 'https://api.mexc.com/api/v3/ticker/24hr';
 	    const response = await axios.get(url);
-	    return response.data.price;
-} catch (error) {
+	    // return response.data.price;
+      for (var i = 0; i < response.data.length; i++) {
+        if (response.data[i].symbol == 'XRPUSDT') {
+          return response.data[i].lastPrice;
+        }
+      }
+  } catch (error) {
       console.error(error);
       return 0;
-} 
-  }
+  } 
+}
 
   async getAccountInfo(client, xrpAddress) {
     const response = await client.request({
