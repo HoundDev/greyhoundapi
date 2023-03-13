@@ -16,7 +16,7 @@ request = BookOffers(
         issuer="rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ"
     ),
     ledger_index="validated",
-    limit=None
+    limit=200  # Increase the limit to get a more accurate estimate
 )
 
 # Send the request and get the response
@@ -37,6 +37,12 @@ for offer in response.result["offers"]:
         xrp = drops_to_xrp(offer['taker_pays_funded'])
     else:
         xrp = drops_to_xrp(offer['TakerPays'])
+    if gh == 0:
+        print("GH is 0, skipping")
+        continue
+    if xrp == 0:
+        print("XRP is 0, skipping")
+        continue
     prices[counter] = {
         "xrp": xrp,
         "gh": gh,
@@ -44,24 +50,33 @@ for offer in response.result["offers"]:
     }
     counter += 1
 
-pprint.pprint(prices)
+# Sort the prices by ascending price
+sorted_prices = sorted(prices.values(), key=lambda x: x['price'])
 
 sumGh = 0
 sumXrp = 0
 avgPrice = 0
 
-for price in prices:
-    sumGh += prices[price]["gh"]
-    sumXrp += prices[price]["xrp"]
-    avgPrice += prices[price]["price"]
+amountXrp = Decimal(input("How much XRP do you want to spend? "))
+
+# Traverse the order book and add up the GH until the total XRP spent is
+# equal to or greater than the amount of XRP that the user wants to trade
+for price in sorted_prices:
+    if sumXrp >= amountXrp:
+        break
+    # sumGh += price["gh"]
+    # sumXrp += price["xrp"]
+    # avgPrice = sumXrp / sumGh
+    if price["xrp"] + sumXrp > amountXrp:
+        # If the price is too high, only add the amount of GH that is needed
+        # to reach the amount of XRP that the user wants to trade
+        sumGh += (amountXrp - sumXrp) / price["price"]
+        sumXrp += (amountXrp - sumXrp)
+        avgPrice = sumXrp / sumGh
+    else:
+        sumGh += price["gh"]
+        sumXrp += price["xrp"]
+        avgPrice = sumXrp / sumGh
 
 print("Total GH: ", sumGh)
 print("Total XRP: ", sumXrp)
-
-amountXrp = Decimal(input("Amount XRP: "))
-
-# Calculate total GH based on the average price
-totalGh = amountXrp / (sumXrp / len(prices)) * (sumGh / len(prices))
-
-print("Total GH based on", amountXrp, "XRP:", totalGh)
-

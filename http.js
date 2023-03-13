@@ -244,64 +244,68 @@ function convertHexToStr(hex) {
 }
 
 async function getNftImage(id,uri) {
-  if(cache.has(id)) {
-    return cache.get(id);
-  }
+  // if(cache.has(id)) {
+  //   return cache.get(id);
+  // }
 
-  if (uri !== "" && uri !== undefined) {
-      //convert the hex string to a string
-      uri = convertHexToStr(uri);
-      if (uri.includes("ipfs://")) {
-          uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
-      }
-      //get the image from the URI
-      try{
-        var response = await axios.get(uri);
-      } catch (error) {
-        console.log('skipping')
-        return {image: "", name: ""};
-      }
-      let data = response.data;
-      //find a field named image
-      let image = data.image;
-      let name = data.name;
-      //return the image
-      if (image === undefined || image === "") {
-          try {
-	          let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
-	          let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
-            let response = await axios.get(onTheDex);
-            let data = response.data;
-            let name = data.name;
-            cache.set(id, {image: imageUrl, name: name});
-            return {image: imageUrl, name: name};
-          } catch (error) {
-            console.log('skipping')
-          }
-      }
-      if (image !== undefined)  {
-      if (image.includes("ipfs://")) {
-        image = image.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
-      }}
-      cache.set(id, {image: image, name: name});
-      return {image: image, name: name};
-  }
-  else {
-        try {
-	      console.log("on the dex api")
-	      let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
-	      let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
-	      let response = await axios.get(onTheDex);
-	      let data = await response.data;
-	      let name = data.name;
-        let attr = data.attributes;
-        let coll = data.collection;
-	      cache.set(id, {image: imageUrl, name: name, attributes: attr, collection: coll});
-	      return {image: imageUrl, name: name, attributes: attr, collection: coll};
-      } catch (error) {
-        console.log('skipping')
-      }
-  }
+  return
+
+  // if (uri !== "" && uri !== undefined) {
+  //     //convert the hex string to a string
+  //     uri = convertHexToStr(uri);
+  //     if (uri.includes("ipfs://")) {
+  //         uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
+  //     }
+  //     //get the image from the URI
+  //     try{
+  //       var response = await axios.get(uri);
+  //     } catch (error) {
+  //       console.log('skipping')
+  //       return {image: "", name: ""};
+  //     }
+  //     let data = response.data;
+  //     //find a field named image
+  //     let image = data.image;
+  //     let name = data.name;
+  //     //return the image
+  //     if (image === undefined || image === "") {
+  //         try {
+	//           let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
+	//           let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
+  //           let response = await axios.get(onTheDex);
+  //           let data = response.data;
+  //           let name = data.name;
+  //           cache.set(id, {image: imageUrl, name: name});
+  //           return {image: imageUrl, name: name};
+  //         } catch (error) {
+  //           console.log('skipping')
+  //         }
+  //     }
+  //     if (image !== undefined)  {
+  //     if (image.includes("ipfs://")) {
+  //       image = image.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
+  //     }}
+  //     cache.set(id, {image: image, name: name});
+  //     return {image: image, name: name};
+  // }
+  // else {
+  //       try {
+	//       console.log("on the dex api")
+	//       let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
+	//       let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
+	//       let response = await axios.get(onTheDex);
+	//       let data = await response.data;
+	//       let name = data.name;
+  //       let attr = data.attributes;
+  //       let coll = data.collection;
+	//       cache.set(id, {image: imageUrl, name: name, attributes: attr, collection: coll});
+	//       return {image: imageUrl, name: name, attributes: attr, collection: coll};
+  //     } catch (error) {
+  //       console.log('skipping')
+  //     }
+  // }
+
+  // return "https://houndsden.app.greyhoundcoin.net/images/houndies/" + id + ".png";
 }
 
 async function getNftImagesParallel(ids,uris)
