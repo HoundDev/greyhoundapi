@@ -228,7 +228,7 @@ app.use("/api/mainData", async function (req, res, next) {
 
 function getDb() {
   return mariadb.createPool({
-    // host: "127.0.0.1",
+    port: process.env.DB_PORT,
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
@@ -844,7 +844,7 @@ app.get("/mint/pending", async function (req, res, next) {
         pid = pid.toString().slice(0, -1);
       }
       console.log(pid);
-      let encrypted = encrypt(`${pid}`, process.env.PASSWORD);
+      let encrypted = encrypt(`${pid}`, process.env.ENC_PASSWORD);
       res.set('Access-Control-Allow-Origin', '*');
       res.send({pending: true, stage: "pending", request_id: encrypted});
       return;
@@ -853,7 +853,7 @@ app.get("/mint/pending", async function (req, res, next) {
     let objectR = pending[0];
     var pid = objectR.request_id;
     //encrypt pid
-    let encryptedPid = encrypt(`${pid}`, process.env.PASSWORD);
+    let encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
 
     if (objectR.request_id != null && objectR.claim_id == null && objectR.offer_id == null && objectR.mint_id == null && objectR.burnt_id == null) {
       res.send({pending: true, stage: "pending", request_id: encryptedPid});
@@ -904,7 +904,7 @@ app.post("/mint/burnt", async function (req, res, next) {
     let pid = req.body.pid;
     console.log(`pid: ${pid}`)
     //decrypt pid
-    pid = decrypt(pid, process.env.PASSWORD);
+    pid = decrypt(pid, process.env.ENC_PASSWORD);
     pid = parseInt(pid);
     //check if the same params are already in the db
     let pending = await pool.query("SELECT * FROM nfts_requests_transactions WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'BURN' AND hash = ?", [pid, txnHash]);
@@ -935,7 +935,7 @@ try {
       // pid = pendingg[0].request_id;
       let pid = req.body.pid;
       //decrypt pid
-      pid = decrypt(pid, process.env.PASSWORD);
+      pid = decrypt(pid, process.env.ENC_PASSWORD);
       pid = parseInt(pid);
       //add address to db
       let rnft = await getRandomNFT();
@@ -968,7 +968,7 @@ app.post("/mint/claim_txn", async function (req, res, next) {
     let hash = req.body.hash;
     let pid = req.body.pid;
     //decrypt pid
-    pid = decrypt(pid, process.env.PASSWORD);
+    pid = decrypt(pid, process.env.ENC_PASSWORD);
     pid = parseInt(pid);
 
     console.log(`updating address: ${address} from offered to claimed`);
