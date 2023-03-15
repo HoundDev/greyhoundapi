@@ -23,16 +23,23 @@ const { parse } = require('csv-parse');
 let mariadb = require('mariadb');
 const crypto = require('crypto');
 
-// Create Express Server
-const app = express();
-app.use(cors());
 
-// Configuration
+const app = express();
+
+const corsOptions = {
+  origin: 'https://houndsden.app.greyhoundcoin.net/',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+
 const PORT = process.env.API_SERVICE_PORT;
 const API_SERVICE_URL = process.env.API_SERVICE_URL;
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
+// app.use(bodyParser.urlencoded({ extended: true }));
+// app.use(bodyParser.json());
 
 var db;
 var storage;
@@ -780,10 +787,8 @@ app.use("/api/eligible", async function (req, res, next) {
     let address = req.query.address;
     //check if the address is in the AidropFinal.csv file
     let eligible = await checkEligible(address);
-    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Origin', 'https://houndsden.app.greyhoundcoin.net/');
     console.log(eligible);
-    // res.send({eligible: eligible});
-    //return 200 if eligible
     if (eligible) {
       res.sendStatus(200);
     }
