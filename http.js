@@ -518,7 +518,7 @@ async function getBalanceChange(address) {
   const client = new xrpl.Client(process.env.XRPL_RPC);
   const time = Math.floor(Date.now() / 1000);
   let time30dayBefore = time - 2592000;
-  let URL = 'https://s1.xrplmeta.org/ledger?time=' + time30dayBefore;
+  let URL = process.env.XRPL_META_URL + '/ledger?time=' + time30dayBefore;
   let response = await axios.get(URL);
   let ledger = response.data.sequence;
   // console.log(ledger);
