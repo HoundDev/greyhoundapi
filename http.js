@@ -707,7 +707,7 @@ const encrypt = (text, password) => {
       throw new Error('OpenSSL Version too old, vulnerability to Heartbleed');
   }
   // let iv = crypto.randomBytes(IV_LENGTH);
-  let iv = process.env.IV;
+  let iv = process.env.ENC_IV;
   iv = Buffer.from(iv, 'utf8');
   let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(password), iv);
   let encrypted = cipher.update(text);
@@ -732,32 +732,32 @@ const decrypt = (text, password) => {
 
 app.get("/mint/pending", async function (req, res, next) {
   try {
-    let address = req.query.address;
+    const address = req.query.address;
     if (currentlyMinting.get(address) === true) {
       res.send({status: "minting"});
       return;
     } 
     console.log(`querying for address: ${address}`);
-    let pending = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
+    const pending = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
     console.log(pending[0])
     if (pending[0] === undefined) {
-      let addedRow = await addToDb(address);
-      let pid = addedRow.insertId;
+      const addedRow = await addToDb(address);
+      const pid = addedRow.insertId;
       //it has `n` at the end, so we need to remove it
       if (pid.toString().endsWith('n')) {
         pid = pid.toString().slice(0, -1);
       }
       console.log(pid);
-      let encrypted = encrypt(`${pid}`, process.env.ENC_PASSWORD);
+      const encrypted = encrypt(`${pid}`, process.env.ENC_PASSWORD);
       res.set('Access-Control-Allow-Origin', '*');
       res.send({pending: true, stage: "pending", request_id: encrypted});
       return;
     }
     res.set('Access-Control-Allow-Origin', process.env.WHITELIST_URL);
-    let objectR = pending[0];
-    var pid = objectR.request_id;
+    const objectR = pending[0];
+    const pid = objectR.request_id;
     //encrypt pid
-    let encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
+    const encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
 
     if (objectR.request_id != null && objectR.claim_id == null && objectR.offer_id == null && objectR.mint_id == null && objectR.burnt_id == null) {
       res.send({pending: true, stage: "pending", request_id: encryptedPid});
