@@ -29,8 +29,7 @@ const app = express();
 const corsOptions = {
   origin: process.env.WHITELIST_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type'],
-  credentials: true
+  allowedHeaders: ['Content-Type']
 };
 
 app.use(cors(corsOptions));
@@ -168,7 +167,10 @@ app.get("/api/greyhoundBalance", async function (req, res, next) {
 
 app.use("/api/mainData", async function (req, res, next) {
   try {
-    const client = new xrpl.Client(process.env.XRPL_RPC);
+    const client = new xrpl.Client(process.env.XRPL_RPC,
+      {
+        connectionTimeout: 60000
+      });
     await client.connect();
     //do the same as above but exclude the prices function and check if the prices are already in cache, if not then get them
     const [GreyHoundAmount, tierLevel, transactions, account_info, account_lines, xrp_balance, tx_fees] = await Promise.all([
@@ -229,6 +231,9 @@ app.use("/api/mainData", async function (req, res, next) {
     res.send(responsePayload);
   } catch(err) {
     console.log(err)
+    if (err instanceof xrpl.NotConnectedError) {
+      console.log("Timeout error");
+    }
     res.send({"error": err});
   }
 });
@@ -681,7 +686,7 @@ app.use("/api/eligible", async function (req, res, next) {
     let address = req.query.address;
     //check if the address is in the AidropFinal.csv file
     let eligible = await checkEligible(address);
-    res.set('Access-Control-Allow-Origin', process.env.WHITELIST_URL);
+    res.set('Access-Control-Allow-Origin',`${process.env.WHITELIST_URL}`);
     console.log(eligible);
     if (eligible) {
       res.sendStatus(200);
@@ -748,7 +753,7 @@ app.get("/mint/pending", async function (req, res, next) {
       res.send({pending: true, stage: "pending", request_id: encrypted});
       return;
     }
-    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Origin', process.env.WHITELIST_URL);
     let objectR = pending[0];
     var pid = objectR.request_id;
     //encrypt pid
