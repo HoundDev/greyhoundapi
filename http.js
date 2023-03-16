@@ -207,7 +207,7 @@ app.use("/api/mainData", async function (req, res, next) {
     let token_volume = await getCachedVolume('12m');
     let transaction_buy = await getCachedOrders('buyData');
     let transaction_sell = await getCachedOrders('sellData');
-    let change = await getBalanceChange(req.body.xrpAddress);
+    let change = await getBalanceChange(client, req.body.xrpAddress);
     const responsePayload = {
       GreyHoundAmount: GreyHoundAmount,
       Transactions: transactions,
@@ -375,7 +375,7 @@ app.use("/api/getNft", async function (req, res, next) {
 
 async function getNftOffs(address)
 {
-  const issuer = "rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW";
+  const issuer = process.env.GREYHOUND_MINTER;
   const client = new xrpl.Client(process.env.XRPL_RPC);
   await client.connect();
   let payload = {
@@ -453,15 +453,12 @@ async function getNftOffs(address)
   return {nfts: nftDict, len: len};  
 }
 
-async function getBalanceChange(address) {
-  const client = new xrpl.Client(process.env.XRPL_RPC);
+async function getBalanceChange(client, address) {
   const time = Math.floor(Date.now() / 1000);
-  let time30dayBefore = time - 2592000;
-  let URL = process.env.XRPL_META_URL + '/ledger?time=' + time30dayBefore;
-  let response = await axios.get(URL);
-  let ledger = response.data.sequence;
-  // console.log(ledger);
-  await client.connect();
+  const timeBefore = time - process.env.BALANCE_TIME;
+  const URL = process.env.XRPL_META_URL + '/ledger?time=' + timeBefore;
+  const response = await axios.get(URL);
+  const ledger = response.data.sequence;
   const account = await client.request({
     command: 'account_lines',
     account: address,
@@ -469,31 +466,27 @@ async function getBalanceChange(address) {
     connectionTimeout: 10000
     });
   let pastBalance = 0;
-    // console.log(account);
-    let lines = account.result.lines
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].currency === '47726579686F756E640000000000000000000000' && lines[i].account === 'rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ') {
-            // console.log(lines[i].balance);
-            pastBalance = lines[i].balance;
-        }
+  let lines = account.result.lines
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].currency === process.env.GREYHOUND_CURRENCY && lines[i].account === process.env.GREYHOUND_ISSUER) {
+      pastBalance = lines[i].balance;
     }
-    const account2 = await client.request({
-      command: 'account_lines',
-      account: address,
-      connectionTimeout: 10000
-      });
-    let currentBalance = 0;
-      
-      let lines2 = account2.result.lines
-      for (let i = 0; i < lines2.length; i++) {
-          if (lines2[i].currency === '47726579686F756E640000000000000000000000' && lines2[i].account === 'rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ') {
-              // console.log(lines[i].balance);
-              currentBalance = lines2[i].balance;
-          }
-      }
-      let balanceChangePercent = ((currentBalance - pastBalance) / pastBalance) * 100;
-      client.disconnect();
-      return balanceChangePercent;
+  }
+  const account2 = await client.request({
+    command: 'account_lines',
+    account: address,
+    connectionTimeout: 10000
+    });
+  let currentBalance = 0;
+    
+  let lines2 = account2.result.lines
+  for (let i = 0; i < lines2.length; i++) {
+    if (lines2[i].currency === process.env.GREYHOUND_CURRENCY && lines2[i].account === process.env.GREYHOUND_ISSUER) {
+      currentBalance = lines2[i].balance;
+    }
+  }
+  let balanceChangePercent = ((currentBalance - pastBalance) / pastBalance) * 100;
+  return balanceChangePercent;
 }
 
 async function getCachedVolume(range) {
@@ -888,7 +881,7 @@ app.post("/mint/claim_txn", async function (req, res, next) {
 
 async function checkHashMint(minting_hash) {
 try {
-	  const client = new xrpl.Client(process.env.XRPL_RPCC);
+	  const client = new xrpl.Client(process.env.XRPL_RPC);
 	  await client.connect();
 	  let submit = await client.request({ command: 'tx', transaction: minting_hash })
 	  let NFT_id = null;
@@ -928,10 +921,10 @@ async function mintNft(cid) {
   return new Promise(async (resolve, reject) => {
     try {
       console.log("Minting NFT: " + cid);
-      const client = new XrplClient(process.env.XRPL_RPCC);
+      const client = new XrplClient(process.env.XRPL_RPC);
       const wallet = derive.familySeed(process.env.WALLET_SECRET);
       const address = wallet.address;
-      const client2 = new xrpl.Client(process.env.XRPL_RPCC);
+      const client2 = new xrpl.Client(process.env.XRPL_RPC);
       await client2.connect();
       const req = await client2.request({ command: 'account_info', account: address })
       const sequence = req.result.account_data.Sequence;
@@ -986,7 +979,7 @@ async function mintNft(cid) {
 async function createNftOffer(nftId,dest) {
 try {
 	  const secret = process.env.WALLET_SECRET;
-	  const client = new xrpl.Client(process.env.XRPL_RPCC);
+	  const client = new xrpl.Client(process.env.XRPL_RPC);
 	  await client.connect();
 	  const wallet = xrpl.Wallet.fromSeed(secret);
 	  const address = wallet.classicAddress;
@@ -1040,7 +1033,7 @@ try {
 }
 
 async function getNftOffer(offerHash) {
-    let client = new xrpl.Client(process.env.XRPL_RPCC);
+    let client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
     let offer = await client.request({
         command: "tx",
