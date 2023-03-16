@@ -251,68 +251,7 @@ function convertHexToStr(hex) {
 }
 
 async function getNftImage(id,uri) {
-  // if(cache.has(id)) {
-  //   return cache.get(id);
-  // }
-
   return
-
-  // if (uri !== "" && uri !== undefined) {
-  //     //convert the hex string to a string
-  //     uri = convertHexToStr(uri);
-  //     if (uri.includes("ipfs://")) {
-  //         uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
-  //     }
-  //     //get the image from the URI
-  //     try{
-  //       var response = await axios.get(uri);
-  //     } catch (error) {
-  //       console.log('skipping')
-  //       return {image: "", name: ""};
-  //     }
-  //     let data = response.data;
-  //     //find a field named image
-  //     let image = data.image;
-  //     let name = data.name;
-  //     //return the image
-  //     if (image === undefined || image === "") {
-  //         try {
-	//           let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
-	//           let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
-  //           let response = await axios.get(onTheDex);
-  //           let data = response.data;
-  //           let name = data.name;
-  //           cache.set(id, {image: imageUrl, name: name});
-  //           return {image: imageUrl, name: name};
-  //         } catch (error) {
-  //           console.log('skipping')
-  //         }
-  //     }
-  //     if (image !== undefined)  {
-  //     if (image.includes("ipfs://")) {
-  //       image = image.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
-  //     }}
-  //     cache.set(id, {image: image, name: name});
-  //     return {image: image, name: name};
-  // }
-  // else {
-  //       try {
-	//       console.log("on the dex api")
-	//       let onTheDex = `https://marketplace-api.onxrp.com/api/metadata/${id}`;
-	//       let imageUrl = `https://marketplace-api.onxrp.com/api/image/${id}`;
-	//       let response = await axios.get(onTheDex);
-	//       let data = await response.data;
-	//       let name = data.name;
-  //       let attr = data.attributes;
-  //       let coll = data.collection;
-	//       cache.set(id, {image: imageUrl, name: name, attributes: attr, collection: coll});
-	//       return {image: imageUrl, name: name, attributes: attr, collection: coll};
-  //     } catch (error) {
-  //       console.log('skipping')
-  //     }
-  // }
-
-  // return "https://houndsden.app.greyhoundcoin.net/images/houndies/" + id + ".png";
 }
 
 async function getNftImagesParallel(ids,uris)
@@ -639,44 +578,6 @@ async function checkEligible(address){
 async function checkRarity(attributes) { 
     try {
       let URL = "https://bafybeigfu3gqvea75rercpqdyjjs2lnuoyh66mz2rjijrtd7zqfux2wjve.ipfs.w3s.link/traits.json"
-      // [
-      //   {
-      //     "label":"1 of 1",
-      //     "count":10000,
-      //     "traits":[
-      //       {
-      //         "label":"Golden Keyblade",
-      //         "count":1,
-      //         "percentage":0.01,
-      //         "cumulative":0.01,
-      //         "score":10000,
-      //         "weight":100000,
-      //         "tier":"Secret"
-      //       }
-      //    },
-      // {
-      //   "label":"Background",
-      //   "count":10000,
-      //   "traits":[
-      //     {
-      //       "label":"Secret",
-      //       "count":7,
-      //       "percentage":0.07,
-      //       "cumulative":0.07,
-      //       "score":1428.57,
-      //       "weight":10000,
-      //       "tier":"Legendary"
-      //     },
-      //     {
-      //       "label":"Gold",
-      //       "count":67,
-      //       "percentage":0.67,
-      //       "cumulative":0.74,
-      //       "score":149.25,
-      //       "weight":10000,
-      //       "tier":"Legendary"
-      //     }
-      // Example of how to get the rarity of a specific attribute
       let response = await axios.get(URL);
       let attributesNew = [];
       for (let i = 0; i < attributes.length; i++) {
