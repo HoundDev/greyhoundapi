@@ -769,7 +769,7 @@ app.get("/mint/pending", async function (req, res, next) {
       const nftId = await checkHashMint(hash[0].hash);
       const offer = await createNftOffer(nftId, address);
 
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, ?)", [objectR.request_id, offer, Math.floor(Date.now() / 1000)]);
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [objectR.request_id, offer]);
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [objectR.request_id]);
       
       let nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
@@ -815,9 +815,7 @@ app.post("/mint/burnt", async function (req, res, next) {
     let pending = await pool.query("SELECT id FROM nfts_requests_transactions WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'BURN' AND hash = ?", [pid, txnHash]);
     if (pending[0] === undefined) {
       //add address to db
-      const date = new Date();
-      const dateAdded = Math.floor(date.getTime() / 1000);
-      const pending = await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'BURN', ?, ?)", [pid, txnHash, dateAdded]);
+      const pending = await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'BURN', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
       pool.query("UPDATE nfts_requests SET `burn_amount` = 10000000000 WHERE id = ?", [pid]);
       res.set('Access-Control-Allow-Origin', '*');
       res.send("success");
@@ -846,11 +844,11 @@ try {
       const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
       const txnHash = await mintNft(cid)   
       //add hash to db
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, ?)", [pid, txnHash, Math.floor(Date.now() / 1000)]);
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
       pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.num, pid]);
       const nftId = await checkHashMint(txnHash);
       const offer = await createNftOffer(nftId, address);
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, ?)", [pid, offer, Math.floor(Date.now() / 1000)]);
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
       await updateNftId(rnft.id, nftId); //update nft id in db
       res.set('Access-Control-Allow-Origin', '*');
@@ -875,7 +873,7 @@ app.post("/mint/claim_txn", async function (req, res, next) {
     //update in nfts_requests to tesSUCCESS
     pool.query("UPDATE nfts_requests SET `status` = 'tesSUCCESS' WHERE id = ?", [pid]);
     //add hash to db
-    pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, ?)", [pid, hash, Math.floor(Date.now() / 1000)]);
+    pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash]);
     res.set('Access-Control-Allow-Origin', '*');
     res.send({status: 'tesSUCCESS'});
 });
