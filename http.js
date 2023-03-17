@@ -651,12 +651,12 @@ app.use("/api/getnftsData", async function (req, res, next) {
         client.disconnect();
         // console.log(nftDataDict);
         cacheURIDATA[nftId] = nftDataDict;
-        res.set('Access-Control-Allow-Origin', '*');
+
         res.send(nftDataDict);
         } else {
           // res.send("No URI")
           let nftData = await getNftImage(nftId,undefined);
-          res.set('Access-Control-Allow-Origin', '*');
+  
           let nftDataDict = {
             "image": nftData.image,
             "name": nftData.name,
@@ -749,11 +749,9 @@ app.get("/mint/pending", async function (req, res, next) {
       }
       console.log(pid);
       const encrypted = encrypt(`${pid}`, process.env.ENC_PASSWORD);
-      res.set('Access-Control-Allow-Origin', '*');
       res.send({pending: true, stage: "pending", request_id: encrypted});
       return;
     }
-    res.set('Access-Control-Allow-Origin', process.env.WHITELIST_URL);
     const objectR = pending[0];
     const pid = objectR.request_id;
     const encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
@@ -817,11 +815,9 @@ app.post("/mint/burnt", async function (req, res, next) {
       //add address to db
       const pending = await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'BURN', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
       pool.query("UPDATE nfts_requests SET `burn_amount` = 10000000000 WHERE id = ?", [pid]);
-      res.set('Access-Control-Allow-Origin', '*');
       res.send("success");
       return;
-    }
-    res.set('Access-Control-Allow-Origin', '*');
+    
     res.send({error: "already in db"});
   } catch (error) {
     console.log(error);
@@ -851,7 +847,6 @@ try {
       pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
       await updateNftId(rnft.id, nftId); //update nft id in db
-      res.set('Access-Control-Allow-Origin', '*');
       res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num});
       //remove from currently minting
       currentlyMinting.delete(address);
@@ -873,8 +868,7 @@ app.post("/mint/claim_txn", async function (req, res, next) {
     //update in nfts_requests to tesSUCCESS
     pool.query("UPDATE nfts_requests SET `status` = 'tesSUCCESS' WHERE id = ?", [pid]);
     //add hash to db
-    pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash]);
-    res.set('Access-Control-Allow-Origin', '*');
+    pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash])
     res.send({status: 'tesSUCCESS'});
 });
 
