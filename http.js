@@ -22,6 +22,7 @@ const axios = require('axios');
 const { parse } = require('csv-parse');
 let mariadb = require('mariadb');
 const crypto = require('crypto');
+const { convertStringToHex } = require("xrpl");
 
 
 const app = express();
@@ -687,7 +688,6 @@ app.use("/api/eligible", async function (req, res, next) {
     let address = req.query.address;
     //check if the address is in the AidropFinal.csv file
     let eligible = await checkEligible(address);
-    res.set('Access-Control-Allow-Origin',`${process.env.WHITELIST_URL}`);
     console.log(eligible);
     if (eligible) {
       res.sendStatus(200);
@@ -719,41 +719,41 @@ const encrypt = (text, password) => {
 
 const decrypt = (text, password) => {
   let textParts = text.split(':');
-  
   let iv = Buffer.from(textParts.shift(), 'hex');
   let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-
   let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(password), iv);
   let decrypted = decipher.update(encryptedText);
 
   decrypted = Buffer.concat([decrypted, decipher.final()]);
+
   return decrypted.toString();
 }
+
 //minting/db endpoints
 app.get("/mint/pending", async function (req, res, next) {
   try {
-    let address = req.query.address;
+    const address = req.query.address;
     if (currentlyMinting.get(address) === true) {
       res.send({status: "minting"});
       return;
     }
     console.log(`querying for address: ${address}`);
-    let pending = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
+    const pending = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
     // console.log(pending[0])
     if (pending[0] === undefined) {
-      let addedRow = await addToDb(address);
-      let pid = addedRow.insertId;
+      const addedRow = await addToDb(address);
+      const pid = addedRow.insertId;
       //it has `n` at the end, so we need to remove it
       if (pid.toString().endsWith('n')) {
         pid = pid.toString().slice(0, -1);
       }
       // console.log(pid);
-      let encrypted = encrypt(`${pid}`, process.env.ENC_PASSWORD);
+      const encrypted = encrypt(`${pid}`, process.env.ENC_PASSWORD);
       res.send({pending: true, stage: "pending", request_id: encrypted});
       return;
     }
-    let objectR = pending[0];
-    var pid = objectR.request_id;
+    const objectR = pending[0];
+    const pid = objectR.request_id;
     //encrypt pid
     let encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
 
@@ -781,14 +781,10 @@ app.get("/mint/pending", async function (req, res, next) {
 
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
 
-      // let offer = await pool.query("SELECT * FROM nfts_requests_transactions WHERE id = ? AND `action` = 'OFFER'", [objectR.offer_id]);
-      let offer = await pool.query("SELECT hash FROM nfts_requests_transactions WHERE id = ?", [objectR.offer_id]);
-      // let nftId = await pool.query("SELECT * FROM nfts_requests WHERE id = ?", [objectR.request_id]);
-      let nftId = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
+      const offerInfo = await pool.query("SELECT rt.hash, r.nft_id, n.cid FROM nfts_requests_transactions rt INNER JOIN nfts_requests r ON r.id = rt.request_id INNER JOIN nfts n ON n.id = r.nft_id WHERE rt.id = ? AND rt.`action` = 'OFFER'", [objectR.offer_id]);
+      const {offerHash, nftId, nftImageCID } = offerInfo[0]
 
-      nftId = nftId[0].nft_id;
-      let offerHash = offer[0].hash;
-      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash,nft_name: nftId});
+      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftId});
 
     } else {
       res.send({pending: false});
@@ -806,16 +802,22 @@ app.post("/mint/burnt", async function (req, res, next) {
     let txnHash = req.body.txnHash;
     let burnt = req.body.burnt;
     console.log(`updating address: ${address} from pending to burnt`);
-    let pid = req.body.pid;
+    let pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
 
-    //decrypt pid
-    pid = decrypt(pid, process.env.ENC_PASSWORD);
-    pid = parseInt(pid);
+
+    //check if the address is in the db same as the one in the request, fetch the address from db with pid
+    let addressDb = await pool.query("SELECT wallet FROM nfts_requests WHERE id = ?", [pid]);
+    if (addressDb[0].address != address) {
+      res.send({error: "address mismatch"});
+      return;
+    }
+
+
     //check if the same params are already in the db
-    let pending = await pool.query("SELECT id FROM nfts_requests_transactions WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'BURN' AND hash = ?", [pid, txnHash]);
+    const pending = await pool.query("SELECT id FROM nfts_requests_transactions WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'BURN' AND hash = ?", [pid, txnHash]);
     if (pending[0] === undefined) {
       //add address to db
-      let pending = await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'BURN', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
+      await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'BURN', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
       pool.query("UPDATE nfts_requests SET `burn_amount` = ? WHERE id = ?", [burnt, pid]);
       res.send("success");
       return;
@@ -828,27 +830,24 @@ app.post("/mint/burnt", async function (req, res, next) {
 
 app.post("/mint/mint_txn", async function (req, res, next) {
 try {
-      let address = req.body.address;
+      const address = req.body.address;
       currentlyMinting.set(address, true);
       console.log(`updating address: ${address} from burnt to minted`);
 
-      let pid = req.body.pid;
-      //decrypt pid
-      pid = decrypt(pid, process.env.ENC_PASSWORD);
-      pid = parseInt(pid);
-
+      const pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
       //add address to db
-      let rnft = await getRandomNFT();
+      const rnft = await getRandomNFT();
       const nftImage = 'https://houndsden.app.greyhoundcoin.net/images/houndies/' + rnft.num + '.png';
-      let cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
-      let txnHash = await mintNft(cid)   
+      
+      const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
+      const txnHash = await mintNft(cid)   
 
       //add hash to db
       pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
       pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.num, pid]);
 
-      let nftId = await checkHashMint(txnHash);
-      let offer = await createNftOffer(nftId, address);
+      const nftId = await checkHashMint(txnHash);
+      const offer = await createNftOffer(nftId, address);
       pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
       await updateNftId(rnft.id, nftId); //update nft id in db
@@ -867,11 +866,7 @@ try {
 app.post("/mint/claim_txn", async function (req, res, next) {
     let address = req.body.address;
     let hash = req.body.hash;
-    let pid = req.body.pid;
-
-    //decrypt pid
-    pid = decrypt(pid, process.env.ENC_PASSWORD);
-    pid = parseInt(pid);
+    const pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
 
     console.log(`updating address: ${address} from offered to claimed`);
     //update in nfts_requests to tesSUCCESS
@@ -882,9 +877,101 @@ app.post("/mint/claim_txn", async function (req, res, next) {
     res.send({status: 'tesSUCCESS'});
 });
 
+app.get("/mint/burn_txn", async function (req, res, next) {
+    const address = req.query.address;
+    console.log(`updating address: ${address} from claimed to burnt\nPID: ${req.query.pid}`);
+    const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
+
+    //check if the address is in the db same as the one in the request, fetch the address from db with pid
+    const addressDb = await pool.query("SELECT wallet FROM nfts_requests WHERE id = ?", [pid]);
+    if (addressDb[0].wallet != address) {
+      res.send({error: "address mismatch", code: 1});
+      return;
+    }
+
+    //create xumm payload
+    const Sdk = new XummSdk(
+      process.env.XUMM_API_KEY,
+      process.env.XUMM_API_SECRET,
+    );
+
+    const payload = await Sdk.payload.create({
+      options: {
+        submit: true
+      },
+      txjson: {
+        TransactionType: "Payment",
+        Account: address,
+        Destination: process.env.BURN_ADDRESS,
+        Amount: {
+          currency: "47726579686F756E640000000000000000000000",
+          issuer: process.env.BURN_ADDRESS,
+          value: process.env.BURN_AMOUNT
+        }
+      },
+      Memos: [
+        {
+          Memo: {
+            MemoData: convertStringToHex("Redeemed through Greyhound Dashboard!"),
+          },
+        },
+      ],
+    });
+
+    res.send({payload: payload, burn_amount: process.env.BURN_AMOUNT});
+});
+
+app.get("/mint/claim_txn", async function (req, res, next) {
+  try {
+    const address = req.query.address;
+    const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
+    const offer = req.query.offer;
+    console.log(`updating address: ${address} from minted to offered\nPID: ${pid}`);
+
+    //check if the address is in the db same as the one in the request, fetch the address from db with pid
+    const addressDb = await pool.query("SELECT wallet FROM nfts_requests WHERE id = ?", [pid]);
+    if (addressDb[0].wallet != address) {
+      res.send({error: "address mismatch", code: 1});
+      return;
+    }
+
+    //create xumm payload
+    const Sdk = new XummSdk(
+      process.env.XUMM_API_KEY,
+      process.env.XUMM_API_SECRET,
+    );
+
+    const xummPayload = {
+      "txjson": {
+        "TransactionType": "NFTokenAcceptOffer",
+        "Account": address,
+        "NFTokenSellOffer": offer,
+        "Memos": [
+          {
+              "Memo": {
+                  "MemoData": convertStringToHex("Minted through the Greyhound Dashboard!")
+              }
+          }
+        ]
+      }
+    }
+
+    const payload = await Sdk.payload.create({
+      options: {
+        submit: true
+      },
+      txjson: xummPayload.txjson
+    });
+
+    res.send({payload: payload});
+  } catch (error) {
+    console.log(error);
+  }
+})
+
+
 async function getRandomNFT() {
-  let row = await pool.query("SELECT n.num FROM nfts n LEFT JOIN nfts_requests nr ON nr.nft_id = n.id WHERE nr.nft_id IS NULL ORDER BY RAND() LIMIT 1")
-  // console.log(row[0]);
+  let row = await pool.query("SELECT n.num,n.cid,n.id FROM nfts n LEFT JOIN nfts_requests nr ON nr.nft_id = n.id WHERE nr.nft_id IS NULL ORDER BY RAND() LIMIT 1")
   return row[0];
 }
 
