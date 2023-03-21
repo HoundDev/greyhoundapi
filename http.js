@@ -804,15 +804,6 @@ app.post("/mint/burnt", async function (req, res, next) {
     console.log(`updating address: ${address} from pending to burnt`);
     let pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
 
-
-    //check if the address is in the db same as the one in the request, fetch the address from db with pid
-    let addressDb = await pool.query("SELECT wallet FROM nfts_requests WHERE id = ?", [pid]);
-    if (addressDb[0].address != address) {
-      res.send({error: "address mismatch"});
-      return;
-    }
-
-
     //check if the same params are already in the db
     const pending = await pool.query("SELECT id FROM nfts_requests_transactions WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'BURN' AND hash = ?", [pid, txnHash]);
     if (pending[0] === undefined) {
