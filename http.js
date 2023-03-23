@@ -820,8 +820,8 @@ app.post("/mint/burnt", async function (req, res, next) {
 });
 
 app.post("/mint/mint_txn", async function (req, res, next) {
-try {
-      const address = req.body.address;
+  const address = req.body.address;  
+  try {
       currentlyMinting.set(address, true);
       console.log(`updating address: ${address} from burnt to minted`);
 
