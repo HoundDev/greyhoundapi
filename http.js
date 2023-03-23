@@ -761,8 +761,31 @@ app.get("/mint/pending", async function (req, res, next) {
       res.send({pending: true, stage: "pending", request_id: encryptedPid});
 
     } else if (objectR.burnt_id != null && objectR.mint_id == null && objectR.offer_id == null && objectR.claim_id == null) {
-      res.send({pending: true, stage: "burnt", request_id: encryptedPid});
+      // res.send({pending: true, stage: "burnt", request_id: encryptedPid});
+      currentlyMinting.set(address, true);
+      console.log(`updating address: ${address} from burnt to minted`);
 
+      //add address to db
+      const rnft = await getRandomNFT();
+      const nftImage = 'https://houndsden.app.greyhoundcoin.net/images/houndies/' + rnft.num + '.png';
+      
+      const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
+      const txnHash = await mintNft(cid)   
+
+      //add hash to db
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
+      pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.num, pid]);
+
+      const nftId = await checkHashMint(txnHash);
+      const offer = await createNftOffer(nftId, address);
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
+      pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
+      await updateNftId(rnft.id, nftId); //update nft id in db
+
+      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num, stage: "offered"});
+
+      //remove from currently minting
+      currentlyMinting.delete(address);
     } else if (objectR.mint_id != null && objectR.offer_id === null && objectR.claim_id === null) {
       // res.send({pending: true, stage: "minted", request_id: objectR.request_id});
       //create offer
@@ -820,8 +843,8 @@ app.post("/mint/burnt", async function (req, res, next) {
 });
 
 app.post("/mint/mint_txn", async function (req, res, next) {
-  const address = req.body.address;  
-  try {
+try {
+      const address = req.body.address;
       currentlyMinting.set(address, true);
       console.log(`updating address: ${address} from burnt to minted`);
 
@@ -1013,16 +1036,11 @@ async function mintNft(cid) {
   return new Promise(async (resolve, reject) => {
     try {
       console.log("Minting NFT: " + cid);
-      const wallet = xrpl.Wallet.fromSeed(process.env.WALLET_SECRET);
-      const address = wallet.classicAddress;
-      //const wallet = derive.familySeed(process.env.WALLET_SECRET);
-      //const address = wallet.address;
-
       const client = new XrplClient(process.env.XRPL_RPC);
-      const client2 = new xrpl.Client(process.env.XRPL_RPC);
-      await client2.connect();
-      const req = await client2.request({ command: 'account_info', account: address })
-      const sequence = req.result.account_data.Sequence;
+      const wallet = derive.familySeed(process.env.WALLET_SECRET);
+      const address = wallet.address;
+      const req = await client.send({ command: 'account_info', account: address })
+      const sequence = req.account_data.Sequence;
 
       const mintTransaction = {
         TransactionType: 'NFTokenMint',
@@ -1059,7 +1077,6 @@ async function mintNft(cid) {
           // console.log("Transaction result:", submit.tx_json.hash)
           resolve(submit.tx_json.hash);
           client.close();
-          await client2.disconnect();
         }
       })
 
