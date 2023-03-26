@@ -24,8 +24,8 @@
     "sqlite3": "^5.0.2",
     "verify-xrpl-signature": "^0.4.0",
     "xrpl": "^2.7.0-beta.2",
-    "xrpl-accountlib": "^1.6.1",
-    "xrpl-client": "^2.0.2",
+    "xrpl-accountlib": "^2.0.3",
+    "xrpl-client": "^2.0.5",
     "xumm-sdk": "^1.1.3"
   }
 }
