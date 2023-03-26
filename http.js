@@ -1037,10 +1037,8 @@ async function mintNft(cid) {
     try {
       console.log("Minting NFT: " + cid);
       const client = new XrplClient(process.env.XRPL_RPC);
-
-      const secret = process.env.WALLET_SECRET;
-      const wallet = xrpl.Wallet.fromSeed(secret);
-      const address = wallet.classicAddress;
+      const wallet = derive.familySeed(process.env.WALLET_SECRET);
+      const address = wallet.address;
       const req = await client.send({ command: 'account_info', account: address })
       const sequence = req.account_data.Sequence;
 
