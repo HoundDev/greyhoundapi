@@ -1048,7 +1048,7 @@ async function getRandomNFT() {
 
 async function updateNftId(id, nftid) {
     // pool.query("UPDATE nfts SET nftid = ? WHERE id = ?", [nftid, id]);
-    pool.query("UPDATE nfts SET nftid = ?, minted = 1 WHERE num = ?", [nftid, id]);
+    pool.query("UPDATE nfts SET nftid = ?, minted = 1 WHERE id = ?", [nftid, id]);
 }
 
 async function checkHashMint(minting_hash) {
