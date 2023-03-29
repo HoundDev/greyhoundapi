@@ -856,7 +856,7 @@ app.get("/mint/pending", async function (req, res, next) {
       let nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
       nftNum = nftNum[0].nft_id;
 
-      await updateNftId(parseInt(nftNum-1), nftId);
+      await updateNftId(parseInt(nftNum+1), nftId);
       res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offer,nft_name: nftNum});
 
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
