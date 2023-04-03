@@ -24,7 +24,6 @@ let mariadb = require('mariadb');
 const crypto = require('crypto');
 const { convertStringToHex } = require("xrpl");
 
-
 const app = express();
 
 const corsOptions = {
