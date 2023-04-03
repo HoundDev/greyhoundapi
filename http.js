@@ -24,7 +24,6 @@ let mariadb = require('mariadb');
 const crypto = require('crypto');
 const { convertStringToHex } = require("xrpl");
 
-
 const app = express();
 
 const corsOptions = {
@@ -945,6 +944,9 @@ app.post("/mint/claim_txn", async function (req, res, next) {
 
     //add hash to db
     pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash]);
+    
+    
+    
     res.send({status: 'tesSUCCESS'});
 });
 
@@ -992,7 +994,7 @@ app.get("/mint/burn_txn", async function (req, res, next) {
     res.send({payload: payload, burn_amount: process.env.BURN_AMOUNT});
 });
 
-app.get("/mint/claim_txn", async function (req, res, next) {
+app.get("/mint/claim_txn_xumm", async function (req, res, next) {
   try {
     const address = req.query.address;
     const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
@@ -1007,11 +1009,13 @@ app.get("/mint/claim_txn", async function (req, res, next) {
     }
 
     //create xumm payload
+    console.log("creating xumm payload");
     const Sdk = new XummSdk(
       process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET,
     );
 
+    console.log("creating xumm payload 2");
     const xummPayload = {
       "txjson": {
         "TransactionType": "NFTokenAcceptOffer",
@@ -1027,6 +1031,8 @@ app.get("/mint/claim_txn", async function (req, res, next) {
       }
     }
 
+    console.log("creating xumm payload 3\n", xummPayload);
+
     const payload = await Sdk.payload.create({
       options: {
         submit: true
@@ -1034,9 +1040,11 @@ app.get("/mint/claim_txn", async function (req, res, next) {
       txjson: xummPayload.txjson
     });
 
+    console.log("creating xumm payload 4\n", payload);
     res.send({payload: payload});
   } catch (error) {
     console.log(error);
+    res.send({error: error});
   }
 })
 
