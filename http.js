@@ -738,6 +738,25 @@ app.use("/api/getnftsData", async function (req, res, next) {
   }
 });
 
+app.get("/api/collection", async function (req, res, next) {
+  try {
+    const url = "https://marketplace-api.onxrp.com/api/nfts?page=1&per_page=10000&sort=fixed_price&order=asc&filters%5Bcollections%5D=16042803&filters%5Bmarketplace_status%5D=active&include=collection,owner"
+    const response = await axios.get(url);
+    const data = response.data.data;
+
+    console.log(data)
+
+    const collectionData = {
+      "name": "Houndie",
+    }
+
+  } catch (error) {
+    console.log(error);
+
+  }
+});
+
+
 app.use("/api/eligible", async function (req, res, next) {
   try {
     console.log(req.query.address);
@@ -786,6 +805,45 @@ const decrypt = (text, password) => {
 }
 
 //minting/db endpoints
+const requestQueue = [];
+
+const handleRequest = async (req, res, next) => {
+  if (requestQueue.length > 0) {
+    const request = requestQueue.shift();
+    const {address, pid } = request;
+    console.log(`processing request for address: ${address}`);
+    currentlyMinting.set(address, true);
+    try {
+
+      const rnft = await getRandomNFT();
+      const nftImage = 'https://houndsden.app.greyhoundcoin.net/images/houndies/' + rnft.num + '.png';
+      
+      const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
+      const txnHash = await mintNft(cid);
+
+      //add hash to db
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
+      pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.num, pid]);
+
+      const nftId = await checkHashMint(txnHash);
+      const offer = await createNftOffer(nftId, address);
+      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
+      pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
+      await updateNftId(rnft.id, nftId); //update nft id in db
+    }
+    catch (err) {
+      console.log(err);
+    } 
+    finally {
+      currentlyMinting.set(address, false);
+    }
+
+    if (requestQueue.length > 0) {
+      handleRequest();
+    }
+  }
+}
+
 app.get("/mint/pending", async function (req, res, next) {
   try {
     const address = req.query.address;
@@ -901,37 +959,55 @@ app.post("/mint/burnt", async function (req, res, next) {
 app.post("/mint/mint_txn", async function (req, res, next) {
 try {
       const address = req.body.address;
-      currentlyMinting.set(address, true);
-      console.log(`updating address: ${address} from burnt to minted`);
-
       const pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
-      //add address to db
-      const rnft = await getRandomNFT();
-      const nftImage = 'https://houndsden.app.greyhoundcoin.net/images/houndies/' + rnft.num + '.png';
-      
-      const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
-      const txnHash = await mintNft(cid)   
 
-      //add hash to db
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
-      pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.num, pid]);
+      requestQueue.push({address: address, pid: pid});
 
-      const nftId = await checkHashMint(txnHash);
-      const offer = await createNftOffer(nftId, address);
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
-      pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
-      await updateNftId(rnft.id, nftId); //update nft id in db
+      if (requestQueue.length === 1) {
+        //start processing
+        handleRequest();
+      }
 
-      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num});
-
-      //remove from currently minting
-      currentlyMinting.delete(address);
-
+      res.send({status: 'added to queue', queue: requestQueue.length,pos: requestQueue.length-1});
   } catch (error) {
     console.log(error);
-        currentlyMinting.delete(address);
   }
 });
+
+app.get('/mint/queue_position', async function (req, res, next) {
+  try {
+    const address = req.query.address;
+    const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
+
+    let pos = requestQueue.findIndex((e) => e.address === address && e.pid === pid);
+
+    if (pos === -1) {
+      res.send({status: 'not in queue'});
+    } else {
+      res.send({status: 'in queue', pos: pos});
+    }
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+app.get('/mint/offer_hash', async function (req, res, next) {
+  try {
+    const address = req.query.address;
+    const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
+
+    let hash = await pool.query("SELECT hash FROM nfts_requests_transactions WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'OFFER'", [pid]);
+
+    if (hash[0] === undefined) {
+      res.send({status: 'not in db'});
+    } else {
+      res.send({ hash: hash[0].hash });
+    }
+  } catch (error) {
+    console.log(error);
+  }
+});
+
 
 app.post("/mint/claim_txn", async function (req, res, next) {
     let address = req.body.address;
@@ -944,8 +1020,6 @@ app.post("/mint/claim_txn", async function (req, res, next) {
 
     //add hash to db
     pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash]);
-    
-    
     
     res.send({status: 'tesSUCCESS'});
 });
