@@ -848,7 +848,10 @@ app.get("/mint/pending", async function (req, res, next) {
   try {
     const address = req.query.address;
     if (currentlyMinting.get(address) === true) {
-      res.send({status: "minting"});
+      const pending = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
+      const objectR = pending[0];
+      const pid = objectR.request_id;
+      res.send({status: "minting", pid: encrypt(pid.toString(), process.env.ENC_PASSWORD)});
       return;
     }
     console.log(`querying for address: ${address}`);
@@ -952,6 +955,7 @@ try {
       res.send({status: 'added to queue', queue: requestQueue.length,pos: requestQueue.length-1});
   } catch (error) {
     console.log(error);
+    
   }
 });
 
