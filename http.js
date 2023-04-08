@@ -945,8 +945,6 @@ app.post("/mint/claim_txn", async function (req, res, next) {
     //add hash to db
     pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash]);
     
-    
-    
     res.send({status: 'tesSUCCESS'});
 });
 
