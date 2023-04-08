@@ -992,7 +992,7 @@ app.get("/mint/burn_txn", async function (req, res, next) {
     res.send({payload: payload, burn_amount: process.env.BURN_AMOUNT});
 });
 
-app.get("/mint/claim_txn", async function (req, res, next) {
+app.get("/mint/claim_txn_xumm", async function (req, res, next) {
   try {
     const address = req.query.address;
     const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
