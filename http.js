@@ -65,6 +65,14 @@ setInterval(function(){
   }
 }, 120000); // 2 minutes
 
+//clear uri cache every 30 minutes
+setInterval(function(){
+  if (cacheURIDATA.size > 0) {
+    cacheURIDATA.clear();
+    console.log("URI cache cleared");
+  }
+}, 1800000); // 30 minutes
+
 // Create a connection pool
 var pool = getDb();
 
@@ -658,9 +666,7 @@ async function checkRarity(attributes) {
         }
         attributesNew.push(attributeNew);
       }
-
       return attributesNew;
-      
     } catch (error) {
       console.log(error);
     }
@@ -682,7 +688,7 @@ app.use("/api/getnftsData", async function (req, res, next) {
         // const attributes = await checkRarity(response.data.data.nftAttributes);
         const address = response.data.data.owner.wallet_id;
         //metadata for all nfts is stored in .dashboard.cache/metadata/num.json
-        let metadata = await fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
+        let metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
         metadata = JSON.parse(metadata);
         const rarity = metadata.rarity;
         const tierNFT = metadata.tier;
@@ -717,7 +723,6 @@ app.use("/api/getnftsData", async function (req, res, next) {
     console.log(err);
   }
 });
-
 
 app.use("/api/eligible", async function (req, res, next) {
   try {
@@ -912,6 +917,43 @@ app.get("/api/allnfts", async function (req, res, next) {
   }
 });
 
+app.get("/api/getRarity", async function (req, res, next) {
+  try {
+    const nftNum = req.query.nftNum;
+    //get rarity from metadata
+    const metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
+    const parsedMetadata = JSON.parse(metadata);
+    const rarity = parsedMetadata.rarity;
+    const tier = parsedMetadata.tier;
+    res.json({rarity: rarity, tier: tier});
+  } catch (err) {
+    console.log(err);
+    res.json({error: err,});
+  }
+});
+
+async function getNftIdFromDb(nftNum) {
+  try {
+    const dbQuery = await pool.query(`SELECT nftid FROM nfts WHERE num = ?`, [nftNum]);
+    const nftId = dbQuery[0].nftid;
+    return nftId;
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+app.get("/api/getNftId", async function (req, res, next) {
+  try {
+    const nftNum = req.query.nftNum;
+    //get rarity from db
+    const nftId = await getNftIdFromDb(nftNum);
+    res.json({nftId: nftId});
+  } catch (err) {
+    console.log(err);
+    res.json({error: err,});
+  }
+});
+
 //encrypt/decrypt
 const encrypt = (text, password) => {
   if (process.versions.openssl <= '1.0.1f') {
@@ -968,10 +1010,10 @@ app.get("/mint/pending", async function (req, res, next) {
     let encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
 
     if (objectR.request_id != null && objectR.claim_id == null && objectR.offer_id == null && objectR.mint_id == null && objectR.burnt_id == null) {
+      console.log('hit 11')
       res.send({pending: true, stage: "pending", request_id: encryptedPid});
-
     } else if (objectR.burnt_id != null && objectR.mint_id == null && objectR.offer_id == null && objectR.claim_id == null) {
-      // res.send({pending: true, stage: "burnt", request_id: encryptedPid});
+      console.log('hit 3')
       currentlyMinting.set(address, true);
       console.log(`updating address: ${address} from burnt to minted`);
 
@@ -992,13 +1034,12 @@ app.get("/mint/pending", async function (req, res, next) {
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
       await updateNftId(rnft.id, nftId); //update nft id in db
 
-      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num, stage: "offered"});
+      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num, stage: "offered", pending: true});
 
       //remove from currently minting
       currentlyMinting.delete(address);
     } else if (objectR.mint_id != null && objectR.offer_id === null && objectR.claim_id === null) {
-      // res.send({pending: true, stage: "minted", request_id: objectR.request_id});
-      //create offer
+      console.log('hit 1')
       let hash = await pool.query("SELECT hash FROM nfts_requests_transactions WHERE id = ?", [objectR.mint_id]);
       let nftId = await checkHashMint(hash[0].hash);
       let offer = await createNftOffer(nftId, address);
@@ -1013,17 +1054,15 @@ app.get("/mint/pending", async function (req, res, next) {
       res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offer,nft_name: nftNum});
 
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
+      console.log('hit 2')
+      const offerSql = await pool.query("SELECT HASH FROM nfts_requests_transactions WHERE request_id = ? AND action='OFFER'", [objectR.request_id]);
+      const offerHash = offerSql[0].HASH;
+      const nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
 
-      const offerInfo = await pool.query("SELECT rt.hash, r.nft_id, n.cid FROM nfts_requests_transactions rt INNER JOIN nfts_requests r ON r.id = rt.request_id INNER JOIN nfts n ON n.id = r.nft_id WHERE rt.id = ? AND rt.`action` = 'OFFER'", [objectR.offer_id]);
-      const {offerHash, nftId, nftImageCID } = offerInfo[0]
-
-      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftId});
-
+      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftNum[0].nft_id});
     } else {
       res.send({pending: false});
     }
-    let object = pending[0];
-    if (object.request_id != null) {}
   } catch (error) {
     console.log(error);
   }
@@ -1114,6 +1153,8 @@ app.get("/mint/burn_txn", async function (req, res, next) {
       return;
     }
 
+    const returnUrl = req.query.return_url;
+
     //create xumm payload
     const Sdk = new XummSdk(
       process.env.XUMM_API_KEY,
@@ -1122,7 +1163,11 @@ app.get("/mint/burn_txn", async function (req, res, next) {
 
     const payload = await Sdk.payload.create({
       options: {
-        submit: true
+        submit: true,
+        return_url: {
+          "app": returnUrl,
+          "web": returnUrl
+        }
       },
       txjson: {
         TransactionType: "Payment",
@@ -1160,6 +1205,8 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
       return;
     }
 
+    const returnUrl = req.query.return_url;
+
     //create xumm payload
     console.log("creating xumm payload");
     const Sdk = new XummSdk(
@@ -1169,6 +1216,13 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
 
     console.log("creating xumm payload 2");
     const xummPayload = {
+      "options": {
+        "submit": true,
+        "return_url": {
+          "app": returnUrl,
+          "web": returnUrl
+          }
+      },
       "txjson": {
         "TransactionType": "NFTokenAcceptOffer",
         "Account": address,
@@ -1187,7 +1241,11 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
 
     const payload = await Sdk.payload.create({
       options: {
-        submit: true
+        submit: true,
+        return_url: {
+          "app": returnUrl,
+          "web": returnUrl
+        }
       },
       txjson: xummPayload.txjson
     });
@@ -1318,7 +1376,7 @@ try {
 	    Account: address,
 	    NFTokenID: nftId,
 	    Destination: dest,
-	    Amount: "1",
+	    Amount: "0",
       Fee: "300",
       Flags: 1
 	  };
