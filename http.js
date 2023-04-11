@@ -180,7 +180,7 @@ app.get("/api/greyhoundBalance", async function (req, res, next) {
     res.send(greyhoundBalance);
   } catch {
     console.log("Error getting greyhound balance");
-    res.send("Error getting greyhound balance");
+    res.send("Error getting greyhound balance\n" + err);
   }
 });
 
@@ -1306,7 +1306,7 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
         txjson: xummPayload.txjson
       };
     }
-    
+
 
     let payload = await Sdk.payload.create(txn);
 
