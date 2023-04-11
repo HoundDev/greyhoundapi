@@ -745,11 +745,18 @@ app.use("/api/eligible", async function (req, res, next) {
 });
 
 async function getSupply() {
-  const url = "https://api.xrpldata.com/api/v1/xls20-nfts/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW/taxon/1";
+  const url = "https://api.xrpldata.com/api/v1/xls20-nfts/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW";
   const response = await axios.get(url);
   const supply = response.data.data.nfts;
-  console.log(supply.length);
-  return supply.length;
+  let filtered = [];
+  for (let i = 0; i < supply.length; i++) {
+    if (supply[i].Taxon === 2) {
+      continue;
+    } else {
+      filtered.push(supply[i]);
+    }
+  }
+  return filtered.length;
 }
 
 async function getFloorData() {
