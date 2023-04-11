@@ -727,17 +727,18 @@ app.use("/api/getnftsData", async function (req, res, next) {
 app.use("/api/eligible", async function (req, res, next) {
   try {
     console.log(req.query.address);
-    let address = req.query.address;
-    //check if the address is in the AidropFinal.csv file
-    let eligible = await checkEligible(address);
-    console.log(eligible);
-    if (eligible) {
-      res.sendStatus(200);
-    }
-    //return 404 if not eligible
-    else {
-      res.sendStatus(404);
-    }
+    res.sendStatus(200);
+    // let address = req.query.address;
+    // //check if the address is in the AidropFinal.csv file
+    // let eligible = await checkEligible(address);
+    // console.log(eligible);
+    // if (eligible) {
+    //   res.sendStatus(200);
+    // }
+    // //return 404 if not eligible
+    // else {
+    //   res.sendStatus(404);
+    // }
   } catch (err) {
     console.log(err);
     res.send(err);
