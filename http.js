@@ -24,7 +24,6 @@ let mariadb = require('mariadb');
 const crypto = require('crypto');
 const { convertStringToHex } = require("xrpl");
 
-
 const app = express();
 
 const corsOptions = {
@@ -48,13 +47,31 @@ var cache = new Map();
 var cacheURIDATA = new Map();
 var priceCache = new Map();
 var currentlyMinting = new Map();
+const miscCache = new Map();
+
 //update the price cache every 5 minutes
 setInterval(function(){
   if (priceCache.size > 0) {
     priceCache.clear();
     console.log("Price cache cleared");
   }
-}, 300000);
+}, 300000); // 5 minutes
+
+//clear miscCache every 2 minutes
+setInterval(function(){
+  if (miscCache.size > 0) {
+    miscCache.clear();
+    console.log("Misc cache cleared");
+  }
+}, 120000); // 2 minutes
+
+//clear uri cache every 30 minutes
+setInterval(function(){
+  if (cacheURIDATA.size > 0) {
+    cacheURIDATA.clear();
+    console.log("URI cache cleared");
+  }
+}, 1800000); // 30 minutes
 
 // Create a connection pool
 var pool = getDb();
@@ -649,9 +666,7 @@ async function checkRarity(attributes) {
         }
         attributesNew.push(attributeNew);
       }
-
       return attributesNew;
-      
     } catch (error) {
       console.log(error);
     }
@@ -664,78 +679,48 @@ app.use("/api/getnftsData", async function (req, res, next) {
     if (nftId in cacheURIDATA) {
       res.send(cacheURIDATA[nftId]);
     } else {
-
-    let address = req.body.address;
-    let client = new xrpl.Client(process.env.XRPL_RPC);
-    await client.connect();
-    let nfts = await xrplHelper.getAccountNFTs(client, address);
-    for (let i = 0; i < nfts.length; i++) {
-      let nft = nfts[i];
-      // console.log(nft);
-      if (nft.NFTokenID === nftId) {
-        let uri = nft.URI;
-        let taxon = nft.NFTokenTaxon;
-        if (uri !== undefined) {
-        uri = convertHexToStr(uri);
-        uri = uri.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
-        let dataDict = await axios.get(uri);
-        let image = dataDict.data.image;
-        let name = dataDict.data.name;
-        let description = dataDict.data.description;
-        let attributes = dataDict.data.attributes;
-        attributes = await checkRarity(attributes);
-        let collection = dataDict.data.collection.family;
-        let rarity = dataDict.data.rarity;
-        let tierNFT = dataDict.data.tier;
-        let anim = dataDict.data.animation;
-        let animFlag = false
-        if (anim !== undefined) {
-          image = anim;
+        // let address = req.body.address;
+        const url = `https://marketplace-api.onxrp.com/api/nfts/${nftId}?include=owner%2CcreatedBy%2CnftAttributes%2Ccollection%2CnftActivities%2Coffers%2Claunchpad&refresh=true`
+        const response = await axios.get(url);
+        const name = response.data.data.name; //#Houndies #xxxx
+        const nftNum = name.split(" ")[1].replace("#", "");
+        const taxon = response.data.data.taxon;
+        // const attributes = await checkRarity(response.data.data.nftAttributes);
+        const address = response.data.data.owner.wallet_id;
+        //metadata for all nfts is stored in .dashboard.cache/metadata/num.json
+        let metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
+        metadata = JSON.parse(metadata);
+        const rarity = metadata.rarity;
+        const tierNFT = metadata.tier;
+        //if there is `animation` in the metadata, then it is an animated NFT
+        let animFlag = false;
+        if ('animation' in metadata) {
           animFlag = true;
+          var image = "https://houndsden.app.greyhoundcoin.net/images/houndies/" + nftNum + ".gif";
+        } else {
+          var image = "https://houndsden.app.greyhoundcoin.net/images/houndies/" + nftNum + ".png";
         }
+        const attributes = await checkRarity(metadata.attributes);
         let nftDataDict = {
           "image": image,
           "name": name,
           "attributes": attributes,
           "owner": address,
           "collection":{
-            "name": collection,
-            "description": description
+            "name": "collection",
+            "description": "Houndies is a collection of 10,000 greyhound avatar NFTs living on the XRPL. Inspired by street art and contemporary design, the collection was crafted by one artist with a singular vision. Each piece of original digital art has its own personality and a unique combination of attributes from a pool of over 200 traits."
           },
           "rarity": rarity,
           "tier": tierNFT,
           "anim": animFlag,
           "taxon": taxon
         }
-        client.disconnect();
         // console.log(nftDataDict);
         cacheURIDATA[nftId] = nftDataDict;
-
         res.send(nftDataDict);
-        } else {
-          // res.send("No URI")
-          let nftData = await getNftImage(nftId,undefined);
-  
-          let nftDataDict = {
-            "image": nftData.image,
-            "name": nftData.name,
-            "attributes": nftData.attributes,
-            "owner": address,
-            "collection":{
-              "name": nftData.collection.name,
-              "description": nftData.collection.description
-            }
-          }
-          cacheURIDATA[nftId] = nftDataDict;
-          res.send(nftDataDict);
-        }
-      }
     }
-    client.disconnect();
-  }
   } catch (err) {
     console.log(err);
-    res.send({error: err});
   }
 });
 
@@ -756,6 +741,216 @@ app.use("/api/eligible", async function (req, res, next) {
   } catch (err) {
     console.log(err);
     res.send(err);
+  }
+});
+
+async function getSupply() {
+  const url = "https://api.xrpldata.com/api/v1/xls20-nfts/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW/taxon/1";
+  const response = await axios.get(url);
+  const supply = response.data.data.nfts;
+  console.log(supply.length);
+  return supply.length;
+}
+
+async function getFloorData() {
+  const url = "https://api.xrpldata.com/api/v1/xls20-nfts/stats/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW/taxon/1";
+  const response = await axios.get(url);
+  const floor = response.data.data.collection_info.floor[0].amount;
+  const unique_owners = response.data.data.collection_info.unique_owners;
+  const sell_offers = response.data.data.collection_info.sell_offers;
+
+  return {
+    floor: floor/1000000,
+    unique_owners: unique_owners,
+    sell_offers: sell_offers
+  }
+}
+
+async function getVolume() {
+  const url = "https://api.xrp.cafe/api/collection/activity/houndies?pageNumber=0";
+  const response = await axios.get(url);
+  let totVolume = 0;
+  for (let i = 0; i < response.data.length; i++) {
+    let volume = response.data[i].volume/1000000;
+    totVolume += volume;
+  }
+  return totVolume;
+}
+
+app.get("/api/getcollection", async function (req, res, next) {
+  try {
+    const about = "Houndies is a collection of 10,000 greyhound avatar NFTs living on the XRPL. Inspired by street art and contemporary design, the collection was crafted by one artist with a singular vision. Each piece of original digital art has its own personality and a unique combination of attributes from a pool of over 200 traits.";
+    const pfp = "https://cdn.xrp.cafe/houndies-pfp.webp";
+    var fire1 = false;
+    var fire2 = false;
+    var fire3 = false;
+    if ('totalsupply' in miscCache) {
+      if (miscCache.totalsupply >= 0) {
+        var totalsupply = miscCache.totalsupply;
+      } else {
+        fire1 = true;
+      }
+    } else {
+      fire1 = true;
+    }
+    if (!('floor' in miscCache) || !('unique_owners' in miscCache) || !('sell_offers' in miscCache)) {
+      fire2 = true;
+    } else {
+      if (miscCache.floor >= 0 && miscCache.unique_owners >= 0 && miscCache.sell_offers >= 0) {
+        var floor = miscCache.floor;
+        var unique_owners = miscCache.unique_owners;
+        var sell_offers = miscCache.sell_offers;
+      } else {
+        fire2 = true;
+      }
+    }
+
+    if ('volume' in miscCache) {
+      if (miscCache.volume >= 0) {
+        var volume = miscCache.volume;
+      } else {
+        fire3 = true;
+      }
+    } else {
+      fire3 = true;
+    }
+
+    if (fire1 && fire2 && fire3) {
+      //make requests in parallel
+      const [totalsupply, floorData, volume] = await Promise.all([getSupply(), getFloorData(), getVolume()]);
+      miscCache.totalsupply = totalsupply;
+      miscCache.floor = floorData.floor;
+      miscCache.unique_owners = floorData.unique_owners;
+      miscCache.sell_offers = floorData.sell_offers;
+      miscCache.volume = volume;
+      var floor = miscCache.floor;
+      var unique_owners = miscCache.unique_owners;
+      var sell_offers = miscCache.sell_offers;
+    } else if (fire1 && fire2) {
+      const [totalsupply, floorData] = await Promise.all([getSupply(), getFloorData()]);
+      miscCache.totalsupply = totalsupply;
+      miscCache.floor = floorData.floor;
+      miscCache.unique_owners = floorData.unique_owners;
+      miscCache.sell_offers = floorData.sell_offers;
+      var floor = miscCache.floor;
+      var unique_owners = miscCache.unique_owners;
+      var sell_offers = miscCache.sell_offers;
+    } else if (fire1 && fire3) {
+      const [totalsupply, volume] = await Promise.all([getSupply(), getVolume()]);
+      miscCache.totalsupply = totalsupply;
+      miscCache.volume = volume;
+    } else if (fire2 && fire3) {
+      const [floorData, volume] = await Promise.all([getFloorData(), getVolume()]);
+      miscCache.floor = floorData.floor;
+      miscCache.unique_owners = floorData.unique_owners;
+      miscCache.sell_offers = floorData.sell_offers;
+      miscCache.volume = volume;
+      var floor = miscCache.floor;
+      var unique_owners = miscCache.unique_owners;
+      var sell_offers = miscCache.sell_offers;
+    } else if (fire1) {
+      const totalsupply = await getSupply();
+      miscCache.totalsupply = totalsupply;
+    } else if (fire2) {
+      const floorData = await getFloorData();
+      miscCache.floor = floorData.floor;
+      miscCache.unique_owners = floorData.unique_owners;
+      miscCache.sell_offers = floorData.sell_offers;
+      var floor = miscCache.floor;
+      var unique_owners = miscCache.unique_owners;
+      var sell_offers = miscCache.sell_offers;
+    } else if (fire3) {
+      const volume = await getVolume();
+      miscCache.volume = volume;
+    } else {
+      //do nothing
+    }
+
+    let listedPercentage = Math.round((miscCache.sell_offers / miscCache.totalsupply) * 10000) / 100;
+    //truncate to 2 decimal places
+
+    res.json({
+      about: about,
+      pfp: pfp,
+      totalsupply: miscCache.totalsupply,
+      floor: miscCache.floor,
+      unique_owners: miscCache.unique_owners,
+      sell_offers: miscCache.sell_offers,
+      listedPercentage: listedPercentage,
+      volume: miscCache.volume
+    });
+  } catch (err) {
+      console.log(err);
+      res.json({error: err});        
+  }
+});
+
+app.get("/api/allnfts", async function (req, res, next) {
+  try {
+    const type = req.query.type;
+    if (type == "lowToHigh") {
+      var order = "asc";
+      var sort = "fixed_price";
+    } else if (type == "highToLow") {
+      var order = "desc";
+      var sort = "fixed_price";
+    } else if (type == "recently_listed") {
+      var sort = "listed_at";
+      var order = "desc";
+    } else {
+      var sort = "rarity_rank";
+      var order = "asc";
+    }
+    const url = `https://marketplace-api.onxrp.com/api/nfts?page=1&per_page=10000&sort=${sort}&order=${order}&filters%5Bcollections%5D=16042803&filters%5Bmarketplace_status%5D=active&include=collection,owner&refresh=true`;
+    const response = await axios.get(url);
+    const json = response.data;
+    const filteredData = []; //if name does not contain `Houndies`, then do not add to filteredData, the name of nfts are `Houndies #1`, `Houndies #2`, etc.
+    for (let i = 0; i < json.data.length; i++) {
+      if (json.data[i].name.includes("Houndies")) {
+        filteredData.push(json.data[i]);
+      }
+    }
+    res.json(filteredData);
+  } catch (err) {
+    console.log(err);
+    res.json({error: err,});
+  }
+});
+
+app.get("/api/getRarity", async function (req, res, next) {
+  try {
+    const nftNum = req.query.nftNum;
+    //get rarity from metadata
+    const metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
+    const parsedMetadata = JSON.parse(metadata);
+    const rarity = parsedMetadata.rarity;
+    const tier = parsedMetadata.tier;
+    res.json({rarity: rarity, tier: tier});
+  } catch (err) {
+    console.log(err);
+    res.json({error: err,});
+  }
+});
+
+async function getNftIdFromDb(nftNum) {
+  try {
+    const dbQuery = await pool.query(`SELECT nftid FROM nfts WHERE num = ?`, [nftNum]);
+    const nftId = dbQuery[0].nftid;
+    return nftId;
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+app.get("/api/getNftId", async function (req, res, next) {
+  try {
+    const nftNum = req.query.nftNum;
+    //get rarity from db
+    const nftId = await getNftIdFromDb(nftNum);
+    res.json({nftId: nftId});
+  } catch (err) {
+    console.log(err);
+    res.json({error: err,});
   }
 });
 
@@ -815,10 +1010,10 @@ app.get("/mint/pending", async function (req, res, next) {
     let encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
 
     if (objectR.request_id != null && objectR.claim_id == null && objectR.offer_id == null && objectR.mint_id == null && objectR.burnt_id == null) {
+      console.log('hit 11')
       res.send({pending: true, stage: "pending", request_id: encryptedPid});
-
     } else if (objectR.burnt_id != null && objectR.mint_id == null && objectR.offer_id == null && objectR.claim_id == null) {
-      // res.send({pending: true, stage: "burnt", request_id: encryptedPid});
+      console.log('hit 3')
       currentlyMinting.set(address, true);
       console.log(`updating address: ${address} from burnt to minted`);
 
@@ -839,13 +1034,12 @@ app.get("/mint/pending", async function (req, res, next) {
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
       await updateNftId(rnft.id, nftId); //update nft id in db
 
-      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num, stage: "offered"});
+      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num, stage: "offered", pending: true});
 
       //remove from currently minting
       currentlyMinting.delete(address);
     } else if (objectR.mint_id != null && objectR.offer_id === null && objectR.claim_id === null) {
-      // res.send({pending: true, stage: "minted", request_id: objectR.request_id});
-      //create offer
+      console.log('hit 1')
       let hash = await pool.query("SELECT hash FROM nfts_requests_transactions WHERE id = ?", [objectR.mint_id]);
       let nftId = await checkHashMint(hash[0].hash);
       let offer = await createNftOffer(nftId, address);
@@ -860,17 +1054,15 @@ app.get("/mint/pending", async function (req, res, next) {
       res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offer,nft_name: nftNum});
 
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
+      console.log('hit 2')
+      const offerSql = await pool.query("SELECT HASH FROM nfts_requests_transactions WHERE request_id = ? AND action='OFFER'", [objectR.request_id]);
+      const offerHash = offerSql[0].HASH;
+      const nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
 
-      const offerInfo = await pool.query("SELECT rt.hash, r.nft_id, n.cid FROM nfts_requests_transactions rt INNER JOIN nfts_requests r ON r.id = rt.request_id INNER JOIN nfts n ON n.id = r.nft_id WHERE rt.id = ? AND rt.`action` = 'OFFER'", [objectR.offer_id]);
-      const {offerHash, nftId, nftImageCID } = offerInfo[0]
-
-      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftId});
-
+      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftNum[0].nft_id});
     } else {
       res.send({pending: false});
     }
-    let object = pending[0];
-    if (object.request_id != null) {}
   } catch (error) {
     console.log(error);
   }
@@ -945,6 +1137,7 @@ app.post("/mint/claim_txn", async function (req, res, next) {
 
     //add hash to db
     pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash]);
+    
     res.send({status: 'tesSUCCESS'});
 });
 
@@ -960,6 +1153,8 @@ app.get("/mint/burn_txn", async function (req, res, next) {
       return;
     }
 
+    const returnUrl = req.query.return_url;
+
     //create xumm payload
     const Sdk = new XummSdk(
       process.env.XUMM_API_KEY,
@@ -968,7 +1163,11 @@ app.get("/mint/burn_txn", async function (req, res, next) {
 
     const payload = await Sdk.payload.create({
       options: {
-        submit: true
+        submit: true,
+        return_url: {
+          "app": returnUrl,
+          "web": returnUrl
+        }
       },
       txjson: {
         TransactionType: "Payment",
@@ -992,7 +1191,7 @@ app.get("/mint/burn_txn", async function (req, res, next) {
     res.send({payload: payload, burn_amount: process.env.BURN_AMOUNT});
 });
 
-app.get("/mint/claim_txn", async function (req, res, next) {
+app.get("/mint/claim_txn_xumm", async function (req, res, next) {
   try {
     const address = req.query.address;
     const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
@@ -1006,13 +1205,24 @@ app.get("/mint/claim_txn", async function (req, res, next) {
       return;
     }
 
+    const returnUrl = req.query.return_url;
+
     //create xumm payload
+    console.log("creating xumm payload");
     const Sdk = new XummSdk(
       process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET,
     );
 
+    console.log("creating xumm payload 2");
     const xummPayload = {
+      "options": {
+        "submit": true,
+        "return_url": {
+          "app": returnUrl,
+          "web": returnUrl
+          }
+      },
       "txjson": {
         "TransactionType": "NFTokenAcceptOffer",
         "Account": address,
@@ -1027,16 +1237,24 @@ app.get("/mint/claim_txn", async function (req, res, next) {
       }
     }
 
+    console.log("creating xumm payload 3\n", xummPayload);
+
     const payload = await Sdk.payload.create({
       options: {
-        submit: true
+        submit: true,
+        return_url: {
+          "app": returnUrl,
+          "web": returnUrl
+        }
       },
       txjson: xummPayload.txjson
     });
 
+    console.log("creating xumm payload 4\n", payload);
     res.send({payload: payload});
   } catch (error) {
     console.log(error);
+    res.send({error: error});
   }
 })
 
@@ -1158,7 +1376,7 @@ try {
 	    Account: address,
 	    NFTokenID: nftId,
 	    Destination: dest,
-	    Amount: "1",
+	    Amount: "0",
       Fee: "300",
       Flags: 1
 	  };
