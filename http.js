@@ -696,9 +696,9 @@ app.use("/api/getnftsData", async function (req, res, next) {
         let animFlag = false;
         if ('animation' in metadata) {
           animFlag = true;
-          var image = "https://houndsden.app.greyhoundcoin.net/images/houndies/" + nftNum + ".gif";
+          var image = process.env.WHITELIST_URL + "/images/houndies/" + nftNum + ".gif";
         } else {
-          var image = "https://houndsden.app.greyhoundcoin.net/images/houndies/" + nftNum + ".png";
+          var image = process.env.WHITELIST_URL + "/images/houndies/" + nftNum + ".png";
         }
         const attributes = await checkRarity(metadata.attributes);
         let nftDataDict = {
@@ -1026,7 +1026,7 @@ app.get("/mint/pending", async function (req, res, next) {
 
       //add address to db
       const rnft = await getRandomNFT();
-      const nftImage = 'https://houndsden.app.greyhoundcoin.net/images/houndies/' + rnft.num + '.png';
+      const nftImage = process.env.WHITELIST_URL + '/images/houndies/' + rnft.num + '.png';
       
       const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
       const txnHash = await mintNft(cid)   
@@ -1108,7 +1108,7 @@ try {
       const pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
       //add address to db
       const rnft = await getRandomNFT();
-      const nftImage = 'https://houndsden.app.greyhoundcoin.net/images/houndies/' + rnft.num + '.png';
+      const nftImage = process.env.WHITELIST_URL + '/images/houndies/' + rnft.num + '.png';
       
       const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
       const txnHash = await mintNft(cid)   
