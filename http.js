@@ -1072,6 +1072,7 @@ app.get("/mint/pending", async function (req, res, next) {
     }
   } catch (error) {
     console.log(error);
+    res.send({error: error});
   }
 });
 
