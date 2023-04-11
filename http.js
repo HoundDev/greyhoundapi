@@ -1163,6 +1163,7 @@ app.get("/mint/burn_txn", async function (req, res, next) {
     }
 
     const mobile = req.query.mobile;
+    console.log(`mobile: ${mobile}`);
 
     const returnUrl = req.query.return_url;
 
@@ -1171,37 +1172,60 @@ app.get("/mint/burn_txn", async function (req, res, next) {
       process.env.XUMM_API_KEY,
       process.env.XUMM_API_SECRET,
     );
-
-  const Txn = {
-    options: {
-      submit: true,
-      return_url: {
-        "app": returnUrl,
-        "web": returnUrl
-      }
-    },
-    txjson: {
-      TransactionType: "Payment",
-      Account: address,
-      Destination: process.env.BURN_ADDRESS,
-      Amount: {
-        currency: "47726579686F756E640000000000000000000000",
-        issuer: process.env.BURN_ADDRESS,
-        value: process.env.BURN_AMOUNT
-      }
-    },
-    Memos: [
-      {
-        Memo: {
-          MemoData: convertStringToHex("Redeemed through Greyhound Dashboard!"),
-        },
+    if (mobile=== false) {
+    var Txn = {
+      options: {
+        submit: true,
+        return_url: {
+          "app": returnUrl,
+          "web": returnUrl
+        }
       },
-    ],
-  };
-
-  if (!mobile) {
-    delete Txn.options.return_url;
+      txjson: {
+        TransactionType: "Payment",
+        Account: address,
+        Destination: process.env.BURN_ADDRESS,
+        Amount: {
+          currency: "47726579686F756E640000000000000000000000",
+          issuer: process.env.BURN_ADDRESS,
+          value: process.env.BURN_AMOUNT
+        }
+      },
+      Memos: [
+        {
+          Memo: {
+            MemoData: convertStringToHex("Redeemed through Greyhound Dashboard!"),
+          },
+        },
+      ],
+    }; 
+  } else {
+    var Txn = {
+      options: {
+        submit: true
+      },
+      txjson: {
+        TransactionType: "Payment",
+        Account: address,
+        Destination: process.env.BURN_ADDRESS,
+        Amount: {
+          currency: "47726579686F756E640000000000000000000000",
+          issuer: process.env.BURN_ADDRESS,
+          value: process.env.BURN_AMOUNT
+        }
+      },
+      Memos: [
+        {
+          Memo: {
+            MemoData: convertStringToHex("Redeemed through Greyhound Dashboard!"),
+          },
+        },
+      ],
+    }; 
   }
+
+
+  
     const payload = await Sdk.payload.create(Txn);
     
     res.send({payload: payload, burn_amount: process.env.BURN_AMOUNT});
@@ -1213,6 +1237,7 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
     const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
     const offer = req.query.offer;
     const isMobile = req.query.mobile;
+    console.log(isMobile)
     console.log(`updating address: ${address} from minted to offered\nPID: ${pid}`);
 
     //check if the address is in the db same as the one in the request, fetch the address from db with pid
@@ -1232,13 +1257,9 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
     );
 
     console.log("creating xumm payload 2");
-    const xummPayload = {
+    let xummPayload = {
       "options": {
-        "submit": true,
-        "return_url": {
-          "app": returnUrl,
-          "web": returnUrl
-          }
+        "submit": true
       },
       "txjson": {
         "TransactionType": "NFTokenAcceptOffer",
@@ -1256,21 +1277,39 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
 
     console.log("creating xumm payload 3\n", xummPayload);
 
-    const payload = await Sdk.payload.create({
-      options: {
-        submit: true,
-        return_url: {
-          "app": returnUrl,
-          "web": returnUrl
-        }
-      },
-      txjson: xummPayload.txjson
-    });
-
-    //if not mobile, then remove return_url
-    if (!isMobile) {
-      delete payload.options.return_url;
+    // let txn = {
+    //   options: {
+    //     submit: true,
+    //     return_url: {
+    //       "app": returnUrl,
+    //       "web": returnUrl
+    //     }
+    //   },
+    //   txjson: xummPayload.txjson
+    // };
+    if (isMobile === "false") {
+      var txn = {
+        options: {
+          submit: true,
+          return_url: {
+            "app": returnUrl,
+            "web": returnUrl
+          }
+        },
+        txjson: xummPayload.txjson
+      };
+    } else {
+      var txn = {
+        options: {
+          submit: true
+        },
+        txjson: xummPayload.txjson
+      };
     }
+    
+
+    let payload = await Sdk.payload.create(txn);
+
 
     console.log("creating xumm payload 4\n", payload);
     res.send({payload: payload});
