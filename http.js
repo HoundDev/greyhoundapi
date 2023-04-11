@@ -1161,6 +1161,8 @@ app.get("/mint/burn_txn", async function (req, res, next) {
       return;
     }
 
+    const mobile = req.query.mobile;
+
     const returnUrl = req.query.return_url;
 
     //create xumm payload
@@ -1169,33 +1171,38 @@ app.get("/mint/burn_txn", async function (req, res, next) {
       process.env.XUMM_API_SECRET,
     );
 
-    const payload = await Sdk.payload.create({
-      options: {
-        submit: true,
-        return_url: {
-          "app": returnUrl,
-          "web": returnUrl
-        }
-      },
-      txjson: {
-        TransactionType: "Payment",
-        Account: address,
-        Destination: process.env.BURN_ADDRESS,
-        Amount: {
-          currency: "47726579686F756E640000000000000000000000",
-          issuer: process.env.BURN_ADDRESS,
-          value: process.env.BURN_AMOUNT
-        }
-      },
-      Memos: [
-        {
-          Memo: {
-            MemoData: convertStringToHex("Redeemed through Greyhound Dashboard!"),
-          },
+  const Txn = {
+    options: {
+      submit: true,
+      return_url: {
+        "app": returnUrl,
+        "web": returnUrl
+      }
+    },
+    txjson: {
+      TransactionType: "Payment",
+      Account: address,
+      Destination: process.env.BURN_ADDRESS,
+      Amount: {
+        currency: "47726579686F756E640000000000000000000000",
+        issuer: process.env.BURN_ADDRESS,
+        value: process.env.BURN_AMOUNT
+      }
+    },
+    Memos: [
+      {
+        Memo: {
+          MemoData: convertStringToHex("Redeemed through Greyhound Dashboard!"),
         },
-      ],
-    });
+      },
+    ],
+  };
 
+  if (!mobile) {
+    delete Txn.options.return_url;
+  }
+    const payload = await Sdk.payload.create(Txn);
+    
     res.send({payload: payload, burn_amount: process.env.BURN_AMOUNT});
 });
 
@@ -1204,6 +1211,7 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
     const address = req.query.address;
     const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
     const offer = req.query.offer;
+    const isMobile = req.query.mobile;
     console.log(`updating address: ${address} from minted to offered\nPID: ${pid}`);
 
     //check if the address is in the db same as the one in the request, fetch the address from db with pid
@@ -1257,6 +1265,11 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
       },
       txjson: xummPayload.txjson
     });
+
+    //if not mobile, then remove return_url
+    if (!isMobile) {
+      delete payload.options.return_url;
+    }
 
     console.log("creating xumm payload 4\n", payload);
     res.send({payload: payload});
