@@ -1068,7 +1068,7 @@ app.get("/mint/pending", async function (req, res, next) {
             pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [objectR.request_id]);
       
             let nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
-            nftNum = nftNum[0].nft_id;
+            nftNum = nftNum[0].nft_id - 1;
       
             await updateNftId(parseInt(nftNum+1), nftId);
             res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offer,nft_name: nftNum});
@@ -1079,7 +1079,7 @@ app.get("/mint/pending", async function (req, res, next) {
       const offerHash = offerSql[0].HASH;
       const nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
 
-      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftNum[0].nft_id, hit: 'hit 2'});
+      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: (nftNum[0].nft_id - 1), hit: 'hit 2'});
     } else {
       res.send({pending: false});
     }
