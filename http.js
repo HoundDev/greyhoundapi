@@ -1116,7 +1116,13 @@ try {
       const nftImage = process.env.WHITELIST_URL + '/images/houndies/' + rnft.num + '.png';
       
       const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
-      const txnHash = await mintNft(cid)   
+      const txnHash = await mintNft(cid)
+
+      if (txnHash === null) {
+        await pool.query("UPDATE nfts_requests_transactions SET `status` = 'mintERROR' WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'MINT'", [pid]);
+        res.send({error: true, pending: true});
+        return;
+      }
 
       //add hash to db
       pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
@@ -1426,33 +1432,33 @@ async function mintNft(cid) {
 }
 
 async function createNftOffer(nftId,dest) {
-try {
-	  const secret = process.env.WALLET_SECRET;
-	  const client = new xrpl.Client(process.env.XRPL_RPC);
-	  await client.connect();
-	  const wallet = xrpl.Wallet.fromSeed(secret);
-	  const address = wallet.classicAddress;
-	
-	  let offer_txn_json = {
-	    TransactionType: "NFTokenCreateOffer",
-	    Account: address,
-	    NFTokenID: nftId,
-	    Destination: dest,
-	    Amount: "0",
-      Fee: "300",
-      Flags: 1
-	  };
-	
-	  const response = await client.submitAndWait(offer_txn_json, {wallet: wallet})
-	  // console.log(`\nTransaction submitted-2: ${response.result.hash}`);
-    let offer = getNftOffer(response.result.hash);
-	
-	  await client.disconnect();
-	
-	  return offer;
-} catch (error) {
-	console.log(error);
-}
+  try {
+      const secret = process.env.WALLET_SECRET;
+      const client = new xrpl.Client(process.env.XRPL_RPC);
+      await client.connect();
+      const wallet = xrpl.Wallet.fromSeed(secret);
+      const address = wallet.classicAddress;
+      
+      let offer_txn_json = {
+        TransactionType: "NFTokenCreateOffer",
+        Account: address,
+        NFTokenID: nftId,
+        Destination: dest,
+        Amount: "0",
+        Fee: "300",
+        Flags: 1
+      };
+      
+      const response = await client.submitAndWait(offer_txn_json, {wallet: wallet})
+      // console.log(`\nTransaction submitted-2: ${response.result.hash}`);
+      let offer = getNftOffer(response.result.hash);
+      
+      await client.disconnect();
+      
+      return offer;
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 async function getNftOffer(offerHash) {
