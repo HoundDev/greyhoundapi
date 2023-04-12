@@ -991,7 +991,6 @@ const decrypt = (text, password) => {
 
 //minting/db endpoints
 app.get("/mint/pending", async function (req, res, next) {
-  try {
     const address = req.query.address;
     if (currentlyMinting.get(address) === true) {
       res.send({status: "minting"});
@@ -1030,36 +1029,45 @@ app.get("/mint/pending", async function (req, res, next) {
       const nftImage = process.env.WHITELIST_URL + '/images/houndies/' + rnft.num + '.png';
       
       const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
-      const txnHash = await mintNft(cid)   
+      const txnHash = await mintNft(cid);
+      if (txnHash === null) {
+        pool.query("UPDATE nfts_requests_transactions SET `status` = 'mintERROR' WHERE id = ?", [objectR.burnt_id]);
+        res.send({error: true, pending: true})
 
-      //add hash to db
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
-      pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.id, pid]);
-
-      const nftId = await checkHashMint(txnHash);
-      const offer = await createNftOffer(nftId, address);
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
-      pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
-      await updateNftId(rnft.id, nftId); //update nft id in db
-
-      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num, stage: "offered", pending: true});
-
-      //remove from currently minting
+        return;
+      }
+        pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
+        pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.id, pid]);
+  
+        const nftId = await checkHashMint(txnHash);
+        console.log(`nft id: ${nftId}`);
+        const offer = await createNftOffer(nftId, address);
+        pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
+        pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
+        await updateNftId(rnft.id, nftId); //update nft id in db
+  
+        res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num, stage: "offered", pending: true});
       currentlyMinting.delete(address);
     } else if (objectR.mint_id != null && objectR.offer_id === null && objectR.claim_id === null) {
-      console.log('hit 1')
-      let hash = await pool.query("SELECT hash FROM nfts_requests_transactions WHERE id = ?", [objectR.mint_id]);
-      let nftId = await checkHashMint(hash[0].hash);
-      let offer = await createNftOffer(nftId, address);
-
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [objectR.request_id, offer.hash]);
-      pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [objectR.request_id]);
-
-      let nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
-      nftNum = nftNum[0].nft_id;
-
-      await updateNftId(parseInt(nftNum+1), nftId);
-      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offer,nft_name: nftNum});
+            console.log('hit 1')
+            let hash = await pool.query("SELECT hash FROM nfts_requests_transactions WHERE id = ?", [objectR.mint_id]);
+            let nftId = await checkHashMint(hash[0].hash);
+            console.log(`nft id: ${nftId}`);
+            if (nftId === null) {
+              pool.query("UPDATE nfts_requests_transactions SET `status` = 'mintERROR' WHERE id = ?", [objectR.mint_id]);
+              res.send({pending: true, error: true});
+              return;
+            }
+            let offer = await createNftOffer(nftId, address);
+      
+            pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [objectR.request_id, offer.hash]);
+            pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [objectR.request_id]);
+      
+            let nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
+            nftNum = nftNum[0].nft_id;
+      
+            await updateNftId(parseInt(nftNum+1), nftId);
+            res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offer,nft_name: nftNum});
 
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
       console.log('hit 2')
@@ -1071,10 +1079,6 @@ app.get("/mint/pending", async function (req, res, next) {
     } else {
       res.send({pending: false});
     }
-  } catch (error) {
-    console.log(error);
-    res.send({error: error});
-  }
 });
 
 app.post("/mint/burnt", async function (req, res, next) {
@@ -1130,8 +1134,11 @@ try {
       currentlyMinting.delete(address);
 
   } catch (error) {
-    console.log(error);
-        currentlyMinting.delete(address);
+    if (error.data.error === "txnNotFound") {
+      console.log("txn not found");
+      res.send({pending: true, error: true})
+      currentlyMinting
+    }
   }
 });
 
@@ -1366,11 +1373,11 @@ try {
 	  return NFT_id;
 } catch (error) {
 	console.log(error);
+  return null;
 }}
 
 async function mintNft(cid) {
   return new Promise(async (resolve, reject) => {
-    try {
       console.log("Minting NFT: " + cid);
       const client = new XrplClient(process.env.XRPL_RPC);
       const wallet = derive.familySeed(process.env.WALLET_SECRET);
@@ -1415,12 +1422,6 @@ async function mintNft(cid) {
           client.close();
         }
       })
-
-
-    } catch (error) {
-      console.log(error);
-      reject(error);
-    }
   })
 }
 
