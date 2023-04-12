@@ -992,6 +992,10 @@ const decrypt = (text, password) => {
 //minting/db endpoints
 app.get("/mint/pending", async function (req, res, next) {
     const address = req.query.address;
+    if (address !== "rbKoFeFtQr2cRMK2jRwhgTa1US9KU6v4L") {
+      res.send({error: true});
+      return;
+    }
     if (currentlyMinting.get(address) === true) {
       res.send({status: "minting"});
       return;
@@ -1075,7 +1079,7 @@ app.get("/mint/pending", async function (req, res, next) {
       const offerHash = offerSql[0].HASH;
       const nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
 
-      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftNum[0].nft_id});
+      res.send({pending: true, stage: "offered", request_id: encryptedPid, offer: offerHash, nft_name: nftNum[0].nft_id, hit: 'hit 2'});
     } else {
       res.send({pending: false});
     }
