@@ -1012,16 +1012,28 @@ app.get("/mint/pending", async function (req, res, next) {
       }
       // console.log(pid);
       const encrypted = encrypt(`${pid}`, process.env.ENC_PASSWORD);
-      res.send({pending: true, stage: "pending", request_id: encrypted});
+      res.send({pending: true, stage: "pending", request_id: encrypted,refresh: true});
       return;
     }
     const objectR = pending[0];
+    console.log(objectR);
     const pid = objectR.request_id;
     //encrypt pid
     let encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
 
     if (objectR.request_id != null && objectR.claim_id == null && objectR.offer_id == null && objectR.mint_id == null && objectR.burnt_id == null) {
       console.log('hit 11')
+      let burnsNotFound = await checkNotBurn(address);
+      // return res.send({pending: false, burnsNotFound: burnsNotFound});
+      if (burnsNotFound.length > 0) {
+        const txn = burnsNotFound[0];
+        const txnHash = txn.tx.hash;
+        //add to db
+        await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'BURN', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
+        await pool.query("UPDATE nfts_requests SET `burn_amount` = ? WHERE id = ?", [process.env.BURN_AMOUNT, pid]);
+        res.send({pending: true, stage: "pending", request_id: encryptedPid,refresh: true,message: "burn found"});
+        return;
+      };
       res.send({pending: true, stage: "pending", request_id: encryptedPid});
     } else if (objectR.burnt_id != null && objectR.mint_id == null && objectR.offer_id == null && objectR.claim_id == null) {
       console.log('hit 3')
@@ -1098,7 +1110,7 @@ app.post("/mint/burnt", async function (req, res, next) {
     if (pending[0] === undefined) {
       //add address to db
       await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'BURN', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
-      pool.query("UPDATE nfts_requests SET `burn_amount` = ? WHERE id = ?", [burnt, pid]);
+      await pool.query("UPDATE nfts_requests SET `burn_amount` = ? WHERE id = ?", [burnt, pid]);
       res.send("success");
       return;
     }
@@ -1193,10 +1205,10 @@ app.get("/mint/burn_txn", async function (req, res, next) {
     var Txn = {
       options: {
         submit: true,
-        return_url: {
-          "app": returnUrl,
-          "web": returnUrl
-        }
+        // return_url: {
+        //   "app": returnUrl,
+        //   "web": returnUrl
+        // }
       },
       txjson: {
         TransactionType: "Payment",
@@ -1308,10 +1320,10 @@ app.get("/mint/claim_txn_xumm", async function (req, res, next) {
       var txn = {
         options: {
           submit: true,
-          return_url: {
-            "app": returnUrl,
-            "web": returnUrl
-          }
+          // return_url: {
+          //   "app": returnUrl,
+          //   "web": returnUrl
+          // }
         },
         txjson: xummPayload.txjson
       };
@@ -1430,6 +1442,11 @@ async function mintNft(cid) {
           // console.log("Transaction result:", submit.tx_json.hash)
           resolve(submit.tx_json.hash);
           client.close();
+          const dbWebhookUrl = 'https://discord.com/api/webhooks/1095528314115993793/XLb--eTKndtfyNKxuBKGP0KjX0JnzMH0FduzazJ7M-mxEVu_ivYjkR2Dscd5MQYu8vAE';
+          //send a post request to the webhook url, and post the result of the transaction
+          const r = await axios.post(dbWebhookUrl, {
+            content: "NFT MINTED: " + submit.tx_json,
+          });
         }
       })
   })
@@ -1492,6 +1509,75 @@ async function getNftOffer(offerHash) {
     }
     return offer;
 }
+
+async function checkNotBurn(address) {
+  try {
+    const client = new xrpl.Client("wss://s1.ripple.com/");
+    const txns = [];
+    await client.connect();
+    let marker = false;
+    let markerValue = null;
+    const preCheck = await client.request({
+      command: "account_tx",
+      account: address,
+      ledger_index_min: 76922119,
+      limit: 1,
+    });
+    console.log(preCheck);
+    if ('marker' in preCheck.result) {
+      marker = true;
+      markerValue = preCheck.result.marker;
+    }
+    if (preCheck.result.transactions.length > 0) {
+      if ('tx' in preCheck.result.transactions[0]) {
+        const txn = preCheck.result.transactions[0].tx;
+        if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === "10000000" && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
+          // console.log("Found burn transaction: " + txn.hash);
+          txns.push(preCheck.result.transactions[0]);
+        }
+      }
+    }
+    while (marker) {
+      // console.log("Getting transactions for account: " + address + " marker: " + markerValue)
+      const response = await client.request({
+        command: "account_tx",
+        account: address,
+        ledger_index_min: 76922119,
+        limit: 1000,
+        marker: markerValue,
+      });
+      if (response.result.transactions.length > 0) {
+        for (let i = 0; i < response.result.transactions.length; i++) {
+          if ('tx' in response.result.transactions[i]) {
+            const txn = response.result.transactions[i].tx;
+            if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === "10000000" && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
+              // console.log("Found burn transaction: " + txn.hash);
+              txns.push(response.result.transactions[i]);
+            }
+          }
+        }
+      }
+        
+      if ('marker' in response.result) {
+        markerValue = response.result.marker;
+      } else {
+        marker = false;
+      }
+    }
+    console.log(txns.length)
+    await client.disconnect();
+  
+    const txnsInDb = await pool.query("SELECT `hash` FROM nfts_requests_transactions rt INNER JOIN nfts_requests r ON r.id = rt.request_id WHERE rt.`action` = 'BURN' AND r.wallet = ?", [address]);
+    const txnsInDbHashes = txnsInDb.map(txn => txn.hash);
+    //find the txns that are not in the db
+    const txnsNotInDb = txns.filter(txn => !txnsInDbHashes.includes(txn.tx.hash));
+    console.log(txnsNotInDb.length)
+    return txnsNotInDb;
+  } catch (error) {
+    console.log(error);
+  }
+}
+
 //Rate Limiting
 const apiLimiter = rateLimit({
 	windowMs: 1 * 60 * 1000, // 1 minutes
