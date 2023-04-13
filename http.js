@@ -1445,7 +1445,7 @@ async function mintNft(cid) {
           const dbWebhookUrl = 'https://discord.com/api/webhooks/1095528314115993793/XLb--eTKndtfyNKxuBKGP0KjX0JnzMH0FduzazJ7M-mxEVu_ivYjkR2Dscd5MQYu8vAE';
           //send a post request to the webhook url, and post the result of the transaction
           const r = await axios.post(dbWebhookUrl, {
-            content: "NFT MINTED: " + submit.tx_json,
+            content: "NFT MINTED: " + submit,
           });
         }
       })
