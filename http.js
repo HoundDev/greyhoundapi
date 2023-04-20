@@ -1116,10 +1116,10 @@ async function getOffer(pid) {
 //minting/db endpoints
 app.get("/mint/pending", async function (req, res, next) {
     const address = req.query.address;
-    if (address !== "rbKoFeFtQr2cRMK2jRwhgTa1US9KU6v4L") {
-      res.send({error: true});
-      return;
-    }
+    // if (address !== "rbKoFeFtQr2cRMK2jRwhgTa1US9KU6v4L") {
+    //   res.send({error: true});
+    //   return;
+    // }
     if (currentlyMinting.get(address) === true) {
       res.send({status: "minting"});
       return;
@@ -1218,6 +1218,8 @@ app.get("/mint/pending", async function (req, res, next) {
         const offerHash = await getOffer(pid);
         //add entry to db
         await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, offerHash]);
+        //update in nfts_requests
+        await pool.query("UPDATE nfts_requests SET `status` = 'tesSUCCESS' WHERE id = ?", [pid]);
 
         res.send({refresh: true});
         return;
