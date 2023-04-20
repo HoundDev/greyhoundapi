@@ -989,13 +989,137 @@ const decrypt = (text, password) => {
   return decrypted.toString();
 }
 
+async function checkOffer(pid) {
+  try {
+    const walletData = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [pid]);
+    const nftId = walletData[0].nft_id;
+    //get nft id from nfts
+    const nftData = await pool.query("SELECT nftid FROM nfts WHERE id = ?", [nftId]);
+    const nftId2 = nftData[0].nftid;
+    const client = new xrpl.Client('wss://s1.ripple.com/');
+    await client.connect();
+    const tx = await client.request({
+      command: 'nft_sell_offers',
+      nft_id: nftId2,
+      binary: false
+    });
+    // console.log(tx.result)
+    const offers = tx.result.offers;
+    for (let index = 0; index < offers.length; index++) {
+      var offer = offers[index];
+      if (offer.owner === "rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW" && offer.amount === '0') {
+        console.log(offer)
+        break;
+      }
+    }
+    await client.disconnect();
+    if (offers.length === 0) {
+      // return false, null;
+      return {offerCheck: false, offerId: null};
+    } else {
+      // return true, offers.nft_offer_index;
+      return {offerCheck: true, offerId: offer.nft_offer_index};
+    }
+  } catch (error) {
+    // console.log(error);
+    if (error.data.error === "objectNotFound") {
+      console.log("No offers found");
+    }
+    // return false, null;
+    return {offerCheck: false, offerId: null};
+  }
+}
+
+async function getOffer(pid) {
+  try {
+    const dbData = await pool.query("SELECT wallet FROM nfts_requests WHERE id = ?", [pid]);
+    const address = dbData[0].wallet;
+
+    const nftOfferHash = await pool.query("SELECT hash FROM nfts_requests_transactions WHERE request_id = ? AND action = 'OFFER'", [pid]);
+    const offerId = nftOfferHash[0].hash;
+
+    const client = new xrpl.Client('wss://s1.ripple.com/');
+    await client.connect();
+    //get the past txns of the address, ledger_index_min = 76922119
+    let marker = false;
+    let markerValue = null;
+    const preCheck = await client.request({
+      command: "account_tx",
+      account: address,
+      ledger_index_min: 76922119,
+      limit: 1,
+    });
+    console.log(preCheck);
+    if ('marker' in preCheck.result) {
+      marker = true;
+      markerValue = preCheck.result.marker;
+    }
+
+    if (preCheck.result.transactions.length > 0) {
+      if ('tx' in preCheck.result.transactions[0]) {
+        const txn = preCheck.result.transactions[0].tx;
+        if ('NFTokenSellOffer' in txn) {
+          const offer = txn.NFTokenSellOffer;
+          if (offer === offerId) {
+            await client.disconnect();
+            return txn.hash;
+          }
+        }
+      }
+
+    }
+
+    while (marker === true) {
+      const txns = await client.request({
+        command: "account_tx",
+        account: address,
+        ledger_index_min: 76922119,
+        marker: markerValue,
+        limit: 1000
+      });
+      if ('marker' in txns.result) {
+        marker = true;
+        markerValue = txns.result.marker;
+      } else {
+        marker = false;
+      }
+      if (txns.result.transactions.length > 0) {
+        for (let index = 0; index < txns.result.transactions.length; index++) {
+          // console.log(`index: ${index}\nHash: ${txns.result.transactions[index].hash}`)
+          const txn = txns.result.transactions[index];
+          if ('tx' in txn) {
+            const txn2 = txn.tx;
+            // console.log(txn2.hash);
+            if ('NFTokenSellOffer' in txn2) {
+              const offer = txn2.NFTokenSellOffer;
+              // console.log(`Found offer: ${offer}`)
+              if (offer === offerId) {
+                await client.disconnect();
+                return txn2.hash;
+              }
+            }
+          }
+        }
+      }
+    }
+  
+    await client.disconnect();
+
+    return null;
+
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+}
+
 //minting/db endpoints
 app.get("/mint/pending", async function (req, res, next) {
     const address = req.query.address;
-    // if (address !== "rbKoFeFtQr2cRMK2jRwhgTa1US9KU6v4L") {
-    //   res.send({error: true});
-    //   return;
-    // }
+    if (address !== "rbKoFeFtQr2cRMK2jRwhgTa1US9KU6v4L") {
+      res.send({error: true});
+      return;
+    }
     if (currentlyMinting.get(address) === true) {
       res.send({status: "minting"});
       return;
@@ -1087,6 +1211,17 @@ app.get("/mint/pending", async function (req, res, next) {
 
     } else if (objectR.offer_id != null && objectR.claim_id == null) {
       console.log('hit 2')
+      const offer = await checkOffer(pid);
+      const offerCheck = offer.offerCheck;
+      const offerId = offer.offerId;
+      if (offerCheck === false) {
+        const offerHash = await getOffer(pid);
+        //add entry to db
+        await pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, offerHash]);
+
+        res.send({refresh: true});
+        return;
+      }
       const offerSql = await pool.query("SELECT HASH FROM nfts_requests_transactions WHERE request_id = ? AND action='OFFER'", [objectR.request_id]);
       const offerHash = offerSql[0].HASH;
       const nftNum = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [objectR.request_id]);
