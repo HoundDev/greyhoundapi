@@ -28,8 +28,8 @@ const app = express();
 
 const corsOptions = {
   origin: process.env.WHITELIST_URL,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Origin', 'X-Auth-Token']
 };
 
 app.use(cors(corsOptions));
