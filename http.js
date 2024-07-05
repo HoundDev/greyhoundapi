@@ -175,7 +175,7 @@ app.get("/api/greyhoundBalance", async function (req, res, next) {
   try {
     const client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
-    const greyhoundBalance = await xrplHelper.getAccountLines(client,req.query.address);
+    const greyhoundBalance = await xrplHelper.getGreyhoundBalance(client,req.query.address);
     await client.disconnect();
     res.send(greyhoundBalance);
   } catch(err) {

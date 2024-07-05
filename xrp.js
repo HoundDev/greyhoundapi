@@ -106,6 +106,16 @@ try {
       return response.result.lines;
   }
 
+  async getGreyhoundBalance(client,xrpAddress,marker){
+    const response = await client.request({
+        command: "account_lines",
+        peer: process.env.GREYHOUND_ISSUER,
+        account: xrpAddress,
+        marker: marker
+      });
+      return response.result.lines;
+  }
+
   async getTransactionMetadata(client, txnHash) {
     const response = await client.request({
       command: "tx",
