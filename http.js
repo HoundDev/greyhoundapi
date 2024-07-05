@@ -1040,13 +1040,13 @@ async function getOffer(pid) {
 
     const client = new xrpl.Client('wss://s1.ripple.com/');
     await client.connect();
-    //get the past txns of the address, ledger_index_min = 76922119
+    //get the past txns of the address, ledger_index_min = 89000000
     let marker = false;
     let markerValue = null;
     const preCheck = await client.request({
       command: "account_tx",
       account: address,
-      ledger_index_min: 76922119,
+      ledger_index_min: 89000000,
       limit: 1,
     });
     console.log(preCheck);
@@ -1073,7 +1073,7 @@ async function getOffer(pid) {
       const txns = await client.request({
         command: "account_tx",
         account: address,
-        ledger_index_min: 76922119,
+        ledger_index_min: 89000000,
         marker: markerValue,
         limit: 1000
       });
@@ -1149,7 +1149,7 @@ app.get("/mint/pending", async function (req, res, next) {
       console.log('hit 11')
       let burnsNotFound = await checkNotBurn(address);
       // return res.send({pending: false, burnsNotFound: burnsNotFound});
-      if (burnsNotFound.length > 0) {
+      if (burnsNotFound && burnsNotFound.length > 0) {
         const txn = burnsNotFound[0];
         const txnHash = txn.tx.hash;
         //add to db
@@ -1264,33 +1264,45 @@ try {
       console.log(`updating address: ${address} from burnt to minted`);
 
       const pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
-      //add address to db
-      const rnft = await getRandomNFT();
-      const nftImage = process.env.WHITELIST_URL + '/images/houndies/' + rnft.num + '.png';
-      
-      const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
-      const txnHash = await mintNft(cid)
 
-      if (txnHash === null) {
-        await pool.query("UPDATE nfts_requests_transactions SET `status` = 'mintERROR' WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'MINT'", [pid]);
-        res.send({error: true, pending: true});
+      //add address to db if we didn't already minted
+      const mintRequests = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.id = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [pid]);
+      if (mintRequests[0] === undefined) {
         return;
       }
+      const mintRequest = mintRequests[0];
 
-      //add hash to db
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
-      pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.id, pid]);
+      if( mintRequest.mint_id == null ){ //don't mint again if we already have one
+        const rnft = await getRandomNFT();
+        const nftImage = process.env.WHITELIST_URL + '/images/houndies/' + rnft.num + '.png';
+        
+        const cid = 'ipfs://' + rnft.cid + '/' + rnft.num + '.json';
+        const txnHash = await mintNft(cid)
 
-      const nftId = await checkHashMint(txnHash);
-      const offer = await createNftOffer(nftId, address);
-      pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
-      pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
-      await updateNftId(rnft.id, nftId); //update nft id in db
+        if (txnHash === null) {
+          await pool.query("UPDATE nfts_requests_transactions SET `status` = 'mintERROR' WHERE request_id = ? AND `status` = 'tesSUCCESS' AND `action` = 'MINT'", [pid]);
+          res.send({error: true, pending: true});
+          return;
+        }
 
-      res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num});
+        //add hash to db
+        pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'MINT', ?, UNIX_TIMESTAMP())", [pid, txnHash]);
+        pool.query("UPDATE nfts_requests SET `nft_id` = ? WHERE id = ?", [rnft.id, pid]);
 
-      //remove from currently minting
-      currentlyMinting.delete(address);
+        const nftId = await checkHashMint(txnHash);
+        const offer = await createNftOffer(nftId, address);
+        pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'OFFER', ?, UNIX_TIMESTAMP())", [pid, offer]);
+        pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
+        await updateNftId(rnft.id, nftId); //update nft id in db
+
+        res.send({nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num});
+
+        //remove from currently minting
+        currentlyMinting.delete(address);
+      }
+      else{
+        return;
+      }
 
   } catch (error) {
     if (error.data.error === "txnNotFound") {
@@ -1656,7 +1668,7 @@ async function checkNotBurn(address) {
     const preCheck = await client.request({
       command: "account_tx",
       account: address,
-      ledger_index_min: 76922119,
+      ledger_index_min: 89000000,
       limit: 1,
     });
     console.log(preCheck);
@@ -1667,7 +1679,7 @@ async function checkNotBurn(address) {
     if (preCheck.result.transactions.length > 0) {
       if ('tx' in preCheck.result.transactions[0]) {
         const txn = preCheck.result.transactions[0].tx;
-        if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === "10000000" && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
+        if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === env.process.BURN_AMOUNT && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
           // console.log("Found burn transaction: " + txn.hash);
           txns.push(preCheck.result.transactions[0]);
         }
@@ -1678,7 +1690,7 @@ async function checkNotBurn(address) {
       const response = await client.request({
         command: "account_tx",
         account: address,
-        ledger_index_min: 76922119,
+        ledger_index_min: 89000000,
         limit: 1000,
         marker: markerValue,
       });
@@ -1686,7 +1698,7 @@ async function checkNotBurn(address) {
         for (let i = 0; i < response.result.transactions.length; i++) {
           if ('tx' in response.result.transactions[i]) {
             const txn = response.result.transactions[i].tx;
-            if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === "10000000" && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
+            if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === env.process.BURN_AMOUNT && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
               // console.log("Found burn transaction: " + txn.hash);
               txns.push(response.result.transactions[i]);
             }
