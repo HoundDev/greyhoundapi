@@ -1624,8 +1624,7 @@ async function getNftOffer(offerHash) {
     await client.connect();
     let offer = await client.request({
         command: "tx",
-        transaction: offerHash,
-        binary: false
+        transaction: offerHash
     });
     await client.disconnect();
     let affectedNodes = offer.result.meta.AffectedNodes;
