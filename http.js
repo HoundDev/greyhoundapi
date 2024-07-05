@@ -1115,6 +1115,7 @@ async function getOffer(pid) {
 
 //minting/db endpoints
 app.get("/mint/pending", async function (req, res, next) {
+  try {
     const address = req.query.address;
     // if (address !== "rbKoFeFtQr2cRMK2jRwhgTa1US9KU6v4L") {
     //   res.send({error: true});
@@ -1232,6 +1233,9 @@ app.get("/mint/pending", async function (req, res, next) {
     } else {
       res.send({pending: false});
     }
+  } catch (error) {
+    console.log(error);
+  }
 });
 
 app.post("/mint/burnt", async function (req, res, next) {
@@ -1258,7 +1262,7 @@ app.post("/mint/burnt", async function (req, res, next) {
 });
 
 app.post("/mint/mint_txn", async function (req, res, next) {
-try {
+  try {
       const address = req.body.address;
       currentlyMinting.set(address, true);
       console.log(`updating address: ${address} from burnt to minted`);
@@ -1314,6 +1318,7 @@ try {
 });
 
 app.post("/mint/claim_txn", async function (req, res, next) {
+  try {  
     let address = req.body.address;
     let hash = req.body.hash;
     const pid = parseInt( decrypt(req.body.pid, process.env.ENC_PASSWORD) )
@@ -1326,9 +1331,13 @@ app.post("/mint/claim_txn", async function (req, res, next) {
     pool.query("INSERT INTO nfts_requests_transactions (request_id, `status`, `action`, hash, datestamp) VALUES (?, 'tesSUCCESS', 'CLAIM', ?, UNIX_TIMESTAMP())", [pid, hash]);
     
     res.send({status: 'tesSUCCESS'});
+  } catch (error) {
+    console.log(error);
+  }    
 });
 
 app.get("/mint/burn_txn", async function (req, res, next) {
+  try {    
     const address = req.query.address;
     console.log(`updating address: ${address} from claimed to burnt\nPID: ${req.query.pid}`);
     const pid = parseInt( decrypt(req.query.pid, process.env.ENC_PASSWORD) )
@@ -1407,6 +1416,9 @@ app.get("/mint/burn_txn", async function (req, res, next) {
     const payload = await Sdk.payload.create(Txn);
     
     res.send({payload: payload, burn_amount: process.env.BURN_AMOUNT});
+  } catch (error) {
+    console.log(error);
+  }      
 });
 
 app.get("/mint/claim_txn_xumm", async function (req, res, next) {
