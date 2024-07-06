@@ -681,18 +681,29 @@ app.use("/api/getnftsData", async function (req, res, next) {
       res.send(cacheURIDATA[nftId]);
     } else {
         // let address = req.body.address;
-        const url = `https://marketplace-api.onxrp.com/api/nfts/${nftId}?include=owner%2CcreatedBy%2CnftAttributes%2Ccollection%2CnftActivities%2Coffers%2Claunchpad&refresh=true`
-        const response = await axios.get(url);
-        const name = response.data.data.name; //#Houndies #xxxx
-        const nftNum = name.split(" ")[1].replace("#", "");
-        const taxon = response.data.data.taxon;
-        // const attributes = await checkRarity(response.data.data.nftAttributes);
-        const address = response.data.data.owner.wallet_id;
+        //const url = `https://marketplace-api.onxrp.com/api/nfts/${nftId}?include=owner%2CcreatedBy%2CnftAttributes%2Ccollection%2CnftActivities%2Coffers%2Claunchpad&refresh=true`
+        //const response = await axios.get(url);
+        //const name = response.data.data.name; //#Houndies #xxxx
+        //const nftNum = name.split(" ")[1].replace("#", "");
+        //const taxon = response.data.data.taxon;
+        const taxon = 1;
+        //const address = response.data.data.owner.wallet_id;
+        const address = ''; //temp
+
+        //get the nft number from the database
+        const nftInfoRecords = await pool.query("SELECT num FROM nfts WHERE nftid = '?'", [nftId]);
+        if (nftInfoRecords[0] === undefined) {
+          return;
+        }
+        const nftNum = nftInfoRecords[0].num;
+
         //metadata for all nfts is stored in .dashboard.cache/metadata/num.json
         let metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
         metadata = JSON.parse(metadata);
         const rarity = metadata.rarity;
         const tierNFT = metadata.tier;
+        const name = metadata.name;
+
         //if there is `animation` in the metadata, then it is an animated NFT
         let animFlag = false;
         if ('animation' in metadata) {
