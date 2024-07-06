@@ -651,7 +651,8 @@ async function checkEligible(address){
 
 async function checkRarity(attributes) { 
     try {
-      let URL = "https://bafybeigfu3gqvea75rercpqdyjjs2lnuoyh66mz2rjijrtd7zqfux2wjve.ipfs.w3s.link/traits.json"
+      let URL = "https://gateway.pinata.cloud/ipfs/bafybeibuwmwoi3qs6lgab6ori4jtocdxwk5sc5zugjdkdblmtttk7ckwla/traits.json"
+      
       let response = await axios.get(URL);
       let attributesNew = [];
       for (let i = 0; i < attributes.length; i++) {
