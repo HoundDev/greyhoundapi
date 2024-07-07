@@ -451,117 +451,125 @@ app.use("/api/getNft", async function (req, res, next) {
 });
 
 async function getNftOffs(address) {
-  const issuer = process.env.GREYHOUND_MINTER;
-  const client = new xrpl.Client(process.env.XRPL_RPC);
-  await client.connect();
-  let payload = {
-    command: "account_nfts",
-    account: issuer,
-    ledger_index: "current",
-    limit: 400
-  };
-  let dataDict = {};
-  while (true) {
-    let data = await client.request(payload);
-    let nfts = data.result.account_nfts;
-    for (let i = 0; i < nfts.length; i++) {
-      let nft = nfts[i];
-      let nftId = nft.NFTokenID;
-      let nftTaxon = nft.NFTokenTaxon;
-      let nftIssuer = nft.Issuer;
-      let nftURI = nft.URI;
-      if (nftIssuer == issuer) {
-        dataDict[nftId] = { taxon: nftTaxon, uri: nftURI };
-      }
-    }
-    if ('marker' in data.result) {
-      payload.marker = data.result.marker;
-    }
-    else {
-      break;
-    }
-    console.log(nfts);
-  }
-  let nftIds = Object.keys(dataDict);
-  let offers = {};
-  let promises = [];
-  for (let i = 0; i < nftIds.length; i++) {
-    let nftId = nftIds[i];
+  try {
+    const issuer = process.env.GREYHOUND_MINTER;
+    const client = new xrpl.Client(process.env.XRPL_RPC);
+    await client.connect();
     let payload = {
-      command: "nft_sell_offers",
-      nft_id: nftId,
-      ledger_index: "validated",
+      command: "account_nfts",
+      account: issuer,
+      ledger_index: "current",
+      limit: 400
     };
-    promises.push(payload);
-  }
+    let dataDict = {};
+    while (true) {
+      let data = await client.request(payload);
+      let nfts = data.result.account_nfts;
+      for (let i = 0; i < nfts.length; i++) {
+        let nft = nfts[i];
+        let nftId = nft.NFTokenID;
+        let nftTaxon = nft.NFTokenTaxon;
+        let nftIssuer = nft.Issuer;
+        let nftURI = nft.URI;
+        if (nftIssuer == issuer) {
+          dataDict[nftId] = { taxon: nftTaxon, uri: nftURI };
+        }
+      }
+      if ('marker' in data.result) {
+        payload.marker = data.result.marker;
+      }
+      else {
+        break;
+      }
+      console.log(nfts);
+    }
+    let nftIds = Object.keys(dataDict);
+    let offers = {};
+    let promises = [];
+    for (let i = 0; i < nftIds.length; i++) {
+      let nftId = nftIds[i];
+      let payload = {
+        command: "nft_sell_offers",
+        nft_id: nftId,
+        ledger_index: "validated",
+      };
+      promises.push(payload);
+    }
 
-  let results = await Promise.allSettled(promises.map(payload => client.request(payload)));
-  for (let i = 0; i < results.length; i++) {
-    let data = results[i];
-    if (data.status == "rejected") {
-      continue;
-    }
-    try {
-      var nftOffers = data.value.result.offers;
-    } catch (error) {
-      console.log(error);
-      continue;
-    }
-    for (let j = 0; j < nftOffers.length; j++) {
-      let offer = nftOffers[j];
-      let dest = offer.destination;
-      let index = offer.nft_offer_index;
-      if (dest == address) {
-        offers[nftIds[i]] = { index: index };
+    let results = await Promise.allSettled(promises.map(payload => client.request(payload)));
+    for (let i = 0; i < results.length; i++) {
+      let data = results[i];
+      if (data.status == "rejected") {
+        continue;
+      }
+      try {
+        var nftOffers = data.value.result.offers;
+      } catch (error) {
+        console.log(error);
+        continue;
+      }
+      for (let j = 0; j < nftOffers.length; j++) {
+        let offer = nftOffers[j];
+        let dest = offer.destination;
+        let index = offer.nft_offer_index;
+        if (dest == address) {
+          offers[nftIds[i]] = { index: index };
+        }
       }
     }
-  }
-  let nftDict = {};
-  for (let i = 0; i < nftIds.length; i++) {
-    let nftId = nftIds[i];
-    if (nftId in offers) {
-      nftDict[nftId] = { taxon: dataDict[nftId].taxon, uri: dataDict[nftId].uri, index: offers[nftId].index };
+    let nftDict = {};
+    for (let i = 0; i < nftIds.length; i++) {
+      let nftId = nftIds[i];
+      if (nftId in offers) {
+        nftDict[nftId] = { taxon: dataDict[nftId].taxon, uri: dataDict[nftId].uri, index: offers[nftId].index };
+      }
     }
-  }
 
-  let len = Object.keys(nftDict).length;
-  return { nfts: nftDict, len: len };
+    let len = Object.keys(nftDict).length;
+    return { nfts: nftDict, len: len };
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 async function getBalanceChange(client, address) {
-  const time = Math.floor(Date.now() / 1000);
-  const timeBefore = time - process.env.BALANCE_TIME;
-  const URL = process.env.XRPL_META_URL + '/ledger?time=' + timeBefore;
-  const response = await axios.get(URL);
-  const ledger = response.data.sequence;
-  const account = await client.request({
-    command: 'account_lines',
-    account: address,
-    ledger_index: ledger,
-    connectionTimeout: 10000
-  });
-  let pastBalance = 0;
-  let lines = account.result.lines
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].currency === process.env.GREYHOUND_CURRENCY && lines[i].account === process.env.GREYHOUND_ISSUER) {
-      pastBalance = lines[i].balance;
+  try {
+    const time = Math.floor(Date.now() / 1000);
+    const timeBefore = time - process.env.BALANCE_TIME;
+    const URL = process.env.XRPL_META_URL + '/ledger?time=' + timeBefore;
+    const response = await axios.get(URL);
+    const ledger = response.data.sequence;
+    const account = await client.request({
+      command: 'account_lines',
+      account: address,
+      ledger_index: ledger,
+      connectionTimeout: 10000
+    });
+    let pastBalance = 0;
+    let lines = account.result.lines
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].currency === process.env.GREYHOUND_CURRENCY && lines[i].account === process.env.GREYHOUND_ISSUER) {
+        pastBalance = lines[i].balance;
+      }
     }
-  }
-  const account2 = await client.request({
-    command: 'account_lines',
-    account: address,
-    connectionTimeout: 10000
-  });
-  let currentBalance = 0;
+    const account2 = await client.request({
+      command: 'account_lines',
+      account: address,
+      connectionTimeout: 10000
+    });
+    let currentBalance = 0;
 
-  let lines2 = account2.result.lines
-  for (let i = 0; i < lines2.length; i++) {
-    if (lines2[i].currency === process.env.GREYHOUND_CURRENCY && lines2[i].account === process.env.GREYHOUND_ISSUER) {
-      currentBalance = lines2[i].balance;
+    let lines2 = account2.result.lines
+    for (let i = 0; i < lines2.length; i++) {
+      if (lines2[i].currency === process.env.GREYHOUND_CURRENCY && lines2[i].account === process.env.GREYHOUND_ISSUER) {
+        currentBalance = lines2[i].balance;
+      }
     }
+    let balanceChangePercent = ((currentBalance - pastBalance) / pastBalance) * 100;
+    return balanceChangePercent;
+  } catch (error) {
+    console.log(error);
   }
-  let balanceChangePercent = ((currentBalance - pastBalance) / pastBalance) * 100;
-  return balanceChangePercent;
 }
 
 async function getCachedVolume(range) {
@@ -751,43 +759,55 @@ app.use("/api/eligible", async function (req, res, next) {
 });
 
 async function getSupply() {
-  const url = "https://api.xrpldata.com/api/v1/xls20-nfts/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW";
-  const response = await axios.get(url);
-  const supply = response.data.data.nfts;
-  let filtered = [];
-  for (let i = 0; i < supply.length; i++) {
-    if (supply[i].Taxon === 2) {
-      continue;
-    } else {
-      filtered.push(supply[i]);
+  try {
+    const url = "https://api.xrpldata.com/api/v1/xls20-nfts/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW";
+    const response = await axios.get(url);
+    const supply = response.data.data.nfts;
+    let filtered = [];
+    for (let i = 0; i < supply.length; i++) {
+      if (supply[i].Taxon === 2) {
+        continue;
+      } else {
+        filtered.push(supply[i]);
+      }
     }
+    return filtered.length;
+  } catch (err) {
+    console.log(err);
   }
-  return filtered.length;
 }
 
 async function getFloorData() {
-  const url = "https://api.xrpldata.com/api/v1/xls20-nfts/stats/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW/taxon/1";
-  const response = await axios.get(url);
-  const floor = response.data.data.collection_info.floor[0].amount;
-  const unique_owners = response.data.data.collection_info.unique_owners;
-  const sell_offers = response.data.data.collection_info.sell_offers;
+  try {
+    const url = "https://api.xrpldata.com/api/v1/xls20-nfts/stats/issuer/rpZidWw84xGD3dp7F81ajM36NZnJFLpSZW/taxon/1";
+    const response = await axios.get(url);
+    const floor = response.data.data.collection_info.floor[0].amount;
+    const unique_owners = response.data.data.collection_info.unique_owners;
+    const sell_offers = response.data.data.collection_info.sell_offers;
 
-  return {
-    floor: floor / 1000000,
-    unique_owners: unique_owners,
-    sell_offers: sell_offers
+    return {
+      floor: floor / 1000000,
+      unique_owners: unique_owners,
+      sell_offers: sell_offers
+    }
+  } catch (err) {
+    console.log(err);
   }
 }
 
 async function getVolume() {
-  const url = "https://api.xrp.cafe/api/collection/activity/houndies?pageNumber=0";
-  const response = await axios.get(url);
-  let totVolume = 0;
-  for (let i = 0; i < response.data.length; i++) {
-    let volume = response.data[i].volume / 1000000;
-    totVolume += volume;
+  try {
+    const url = "https://api.xrp.cafe/api/collection/activity/houndies?pageNumber=0";
+    const response = await axios.get(url);
+    let totVolume = 0;
+    for (let i = 0; i < response.data.length; i++) {
+      let volume = response.data[i].volume / 1000000;
+      totVolume += volume;
+    }
+    return totVolume;
+  } catch (err) {
+    console.log(err);
   }
-  return totVolume;
 }
 
 app.get("/api/getcollection", async function (req, res, next) {
@@ -1566,57 +1586,62 @@ async function checkHashMint(minting_hash) {
 }
 
 async function mintNft(cid) {
-  return new Promise(async (resolve, reject) => {
-    console.log("Minting NFT: " + cid);
-    const client = new XrplClient(process.env.XRPL_RPC);
-    const wallet = derive.familySeed(process.env.WALLET_SECRET);
-    const address = wallet.address;
-    const req = await client.send({ command: 'account_info', account: address })
-    const sequence = req.account_data.Sequence;
+  try {
+    return new Promise(async (resolve, reject) => {
+      console.log("Minting NFT: " + cid);
+      const client = new XrplClient(process.env.XRPL_RPC);
+      const wallet = derive.familySeed(process.env.WALLET_SECRET);
+      const address = wallet.address;
+      const req = await client.send({ command: 'account_info', account: address })
+      const sequence = req.account_data.Sequence;
 
-    const mintTransaction = {
-      TransactionType: 'NFTokenMint',
-      Account: address,
-      TransferFee: parseInt("5000"),
-      NFTokenTaxon: 1,
-      URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
-      Fee: "300",
-      Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
-      Sequence: sequence,
-      "Memos": [
-        {
-          "Memo": {
-            "MemoType": Buffer.from("NFT", 'utf-8').toString('hex').toUpperCase(),
-            "MemoData": Buffer.from("NFT From Greyhound Dashboard!", 'utf-8').toString('hex').toUpperCase()
+      const mintTransaction = {
+        TransactionType: 'NFTokenMint',
+        Account: address,
+        TransferFee: parseInt("5000"),
+        NFTokenTaxon: 1,
+        URI: Buffer.from(String(cid), 'utf-8').toString('hex').toUpperCase(),
+        Fee: "300",
+        Flags: (xrpl.NFTokenMintFlags.tfTransferable + xrpl.NFTokenMintFlags.tfOnlyXRP),
+        Sequence: sequence,
+        "Memos": [
+          {
+            "Memo": {
+              "MemoType": Buffer.from("NFT", 'utf-8').toString('hex').toUpperCase(),
+              "MemoData": Buffer.from("NFT From Greyhound Dashboard!", 'utf-8').toString('hex').toUpperCase()
+            }
           }
+        ]
+      }
+
+      const signed = sign(mintTransaction, wallet);
+      // console.log('Signed transaction: ', signed.signedTransaction)
+      const submit = await client.send(
+        {
+          command: 'submit',
+          tx_blob: signed.signedTransaction
         }
-      ]
-    }
+      )
 
-    const signed = sign(mintTransaction, wallet);
-    // console.log('Signed transaction: ', signed.signedTransaction)
-    const submit = await client.send(
-      {
-        command: 'submit',
-        tx_blob: signed.signedTransaction
-      }
-    )
+      const val_ledger = submit.validated_ledger_index;
 
-    const val_ledger = submit.validated_ledger_index;
-
-    client.on('ledger', async (ledger) => {
-      if (ledger.ledger_index > val_ledger + 1) {
-        // console.log("Transaction result:", submit.tx_json.hash)
-        resolve(submit.tx_json.hash);
-        client.close();
-        const dbWebhookUrl = 'https://discord.com/api/webhooks/1095528314115993793/XLb--eTKndtfyNKxuBKGP0KjX0JnzMH0FduzazJ7M-mxEVu_ivYjkR2Dscd5MQYu8vAE';
-        //send a post request to the webhook url, and post the result of the transaction
-        const r = await axios.post(dbWebhookUrl, {
-          content: "NFT MINTED: " + submit,
-        });
-      }
+      client.on('ledger', async (ledger) => {
+        if (ledger.ledger_index > val_ledger + 1) {
+          // console.log("Transaction result:", submit.tx_json.hash)
+          resolve(submit.tx_json.hash);
+          client.close();
+          const dbWebhookUrl = 'https://discord.com/api/webhooks/1095528314115993793/XLb--eTKndtfyNKxuBKGP0KjX0JnzMH0FduzazJ7M-mxEVu_ivYjkR2Dscd5MQYu8vAE';
+          //send a post request to the webhook url, and post the result of the transaction
+          const r = await axios.post(dbWebhookUrl, {
+            content: "NFT MINTED: " + submit,
+          });
+        }
+      })
     })
-  })
+
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 async function createNftOffer(nftId, dest) {
@@ -1650,30 +1675,34 @@ async function createNftOffer(nftId, dest) {
 }
 
 async function getNftOffer(offerHash) {
-  let client = new xrpl.Client(process.env.XRPL_RPC);
-  await client.connect();
-  let offer = await client.request({
-    command: "tx",
-    transaction: offerHash
-  });
-  await client.disconnect();
-  let affectedNodes = offer.result.meta.AffectedNodes;
-  for (let index = 0; index < affectedNodes.length; index++) {
-    const affectedNode = affectedNodes[index];
-    if (affectedNode.hasOwnProperty('ModifiedNode')) {
-      if (affectedNode.ModifiedNode.LedgerEntryType == "NFTokenOffer") {
-        offer = affectedNode.ModifiedNode.LedgerIndex;
-        break;
+  try {
+    let client = new xrpl.Client(process.env.XRPL_RPC);
+    await client.connect();
+    let offer = await client.request({
+      command: "tx",
+      transaction: offerHash
+    });
+    await client.disconnect();
+    let affectedNodes = offer.result.meta.AffectedNodes;
+    for (let index = 0; index < affectedNodes.length; index++) {
+      const affectedNode = affectedNodes[index];
+      if (affectedNode.hasOwnProperty('ModifiedNode')) {
+        if (affectedNode.ModifiedNode.LedgerEntryType == "NFTokenOffer") {
+          offer = affectedNode.ModifiedNode.LedgerIndex;
+          break;
+        }
+      }
+      else if (affectedNode.hasOwnProperty('CreatedNode')) {
+        if (affectedNode.CreatedNode.LedgerEntryType == "NFTokenOffer") {
+          offer = affectedNode.CreatedNode.LedgerIndex;
+          break;
+        }
       }
     }
-    else if (affectedNode.hasOwnProperty('CreatedNode')) {
-      if (affectedNode.CreatedNode.LedgerEntryType == "NFTokenOffer") {
-        offer = affectedNode.CreatedNode.LedgerIndex;
-        break;
-      }
-    }
+    return offer;
+  } catch (error) {
+    console.log(error);
   }
-  return offer;
 }
 
 async function checkNotBurn(address) {
