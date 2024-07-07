@@ -7,8 +7,8 @@ class XrplHelpers {
   async getTokenPrice(base, quote) {
     try {
       const response = await axios.get('https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=' + quote + '&bars=30&interval=D&tf=ISO');
-      let body       = response['data'];
-      let prices     = [];
+      let body = response['data'];
+      let prices = [];
       if ('error' in body) {
         return 0;
       }
@@ -22,35 +22,35 @@ class XrplHelpers {
     }
   }
 
-  async getLiveTokenPrice(base){
-try {
+  async getLiveTokenPrice(base) {
+    try {
       const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
       const response = await axios.get(url);
       if ('error' in response.data) {
         return 0;
       }
       return response.data.data['ohlc'][response.data.data['ohlc'].length - 1].c;
-} catch (error) {
+    } catch (error) {
       console.error(error);
       return 0;
-}
+    }
   }
 
   async getLiveXrpPrice() {
-  try {
-	    const url = 'https://api.mexc.com/api/v3/ticker/24hr';
-	    const response = await axios.get(url);
-	    // return response.data.price;
+    try {
+      const url = 'https://api.mexc.com/api/v3/ticker/24hr';
+      const response = await axios.get(url);
+      // return response.data.price;
       for (var i = 0; i < response.data.length; i++) {
         if (response.data[i].symbol == 'XRPUSDT') {
           return response.data[i].lastPrice;
         }
       }
-  } catch (error) {
+    } catch (error) {
       console.error(error);
       return 0;
-  } 
-}
+    }
+  }
 
   async getAccountInfo(client, xrpAddress) {
     const response = await client.request({
@@ -68,7 +68,7 @@ try {
     while (true) {
       var payload = {
         command: "account_nfts",
-        account:xrpAddress,
+        account: xrpAddress,
         ledger_index: "validated",
         limit: 400
       }
@@ -88,32 +88,32 @@ try {
   }
 
 
-  async getAccountTransactions(client,xrpAddress){
+  async getAccountTransactions(client, xrpAddress) {
     const response = await client.request({
-        command: "account_tx",
-        account: xrpAddress,
-        limit:20
-      });
-      return response.result.transactions;
+      command: "account_tx",
+      account: xrpAddress,
+      limit: 20
+    });
+    return response.result.transactions;
   }
 
-  async getAccountLines(client,xrpAddress,marker){
+  async getAccountLines(client, xrpAddress, marker) {
     const response = await client.request({
-        command: "account_lines",
-        account: xrpAddress,
-        marker: marker
-      });
-      return response.result.lines;
+      command: "account_lines",
+      account: xrpAddress,
+      marker: marker
+    });
+    return response.result.lines;
   }
 
-  async getGreyhoundBalance(client,xrpAddress,marker){
+  async getGreyhoundBalance(client, xrpAddress, marker) {
     const response = await client.request({
-        command: "account_lines",
-        peer: process.env.GREYHOUND_ISSUER,
-        account: xrpAddress,
-        marker: marker
-      });
-      return response.result.lines;
+      command: "account_lines",
+      peer: process.env.GREYHOUND_ISSUER,
+      account: xrpAddress,
+      marker: marker
+    });
+    return response.result.lines;
   }
 
   async getTransactionMetadata(client, txnHash) {
@@ -135,25 +135,24 @@ try {
     return xrpl.dropsToXrp(response.result.account_data.Balance);
   }
 
-  async getAccountSellOffers(client, tokenId)
-  {
-      let nftSellOffers
-        try {
-            nftSellOffers = await client.request({
-            method: "nft_sell_offers",
-            tokenid: tokenId
-          })
-          } catch (err) {
-            console.log("No sell offers.")
-        }
-        return nftSellOffers.result;
+  async getAccountSellOffers(client, tokenId) {
+    let nftSellOffers
+    try {
+      nftSellOffers = await client.request({
+        method: "nft_sell_offers",
+        tokenid: tokenId
+      })
+    } catch (err) {
+      console.log("No sell offers.")
+    }
+    return nftSellOffers.result;
   }
-  
-  async getTransactionFee(client){
+
+  async getTransactionFee(client) {
     const response = await client.request({
-        command: "fee",
-      });
-      return response.result.drops.base_fee;
+      command: "fee",
+    });
+    return response.result.drops.base_fee;
   }
 
   TransactionRequestPayload(xrpAddress) {
