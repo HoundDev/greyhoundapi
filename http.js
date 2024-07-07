@@ -675,7 +675,8 @@ async function checkRarity(attributes) {
 
 app.use("/api/getnftsData", async function (req, res, next) {
   try {
-    let nftId = req.body.id;
+    const nftId = req.body.id;
+    
     //check if nft is in cache
     if (nftId in cacheURIDATA) {
       res.send(cacheURIDATA[nftId]);
@@ -686,16 +687,13 @@ app.use("/api/getnftsData", async function (req, res, next) {
         //const name = response.data.data.name; //#Houndies #xxxx
         //const nftNum = name.split(" ")[1].replace("#", "");
         //const taxon = response.data.data.taxon;
-        const taxon = 1;
         //const address = response.data.data.owner.wallet_id;
-        const address = ''; //temp
 
-        //get the nft number from the database
-        const nftInfoRecords = await pool.query("SELECT num FROM nfts WHERE nftid = '?'", [nftId]);
-        if (nftInfoRecords[0] === undefined) {
-          return;
-        }
+        const taxon = 1;
+        const address = ''; //temp
+        const nftInfoRecords = await pool.query("SELECT num FROM nfts WHERE nftid = ?", [nftId]);    
         const nftNum = nftInfoRecords[0].num;
+        
 
         //metadata for all nfts is stored in .dashboard.cache/metadata/num.json
         let metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
@@ -732,6 +730,7 @@ app.use("/api/getnftsData", async function (req, res, next) {
         res.send(nftDataDict);
     }
   } catch (err) {
+    res.send(err);
     console.log(err);
   }
 });
