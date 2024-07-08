@@ -1635,7 +1635,7 @@ async function mintNft(cid) {
       )
 
       const val_ledger = submit.validated_ledger_index;
-
+      /*
       client.on('ledger', async (ledger) => {
         if (ledger.ledger_index > val_ledger + 1) {
           // console.log("Transaction result:", submit.tx_json.hash)
@@ -1648,6 +1648,7 @@ async function mintNft(cid) {
           });
         }
       })
+      */
     })
 
   } catch (error) {
