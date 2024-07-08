@@ -1635,20 +1635,18 @@ async function mintNft(cid) {
       )
 
       const val_ledger = submit.validated_ledger_index;
-      /*
       client.on('ledger', async (ledger) => {
         if (ledger.ledger_index > val_ledger + 1) {
           // console.log("Transaction result:", submit.tx_json.hash)
           resolve(submit.tx_json.hash);
           client.close();
-          const dbWebhookUrl = 'https://discord.com/api/webhooks/1095528314115993793/XLb--eTKndtfyNKxuBKGP0KjX0JnzMH0FduzazJ7M-mxEVu_ivYjkR2Dscd5MQYu8vAE';
+          //const dbWebhookUrl = 'https://discord.com/api/webhooks/1095528314115993793/XLb--eTKndtfyNKxuBKGP0KjX0JnzMH0FduzazJ7M-mxEVu_ivYjkR2Dscd5MQYu8vAE';
           //send a post request to the webhook url, and post the result of the transaction
-          const r = await axios.post(dbWebhookUrl, {
-            content: "NFT MINTED: " + submit,
-          });
+          //const r = await axios.post(dbWebhookUrl, {
+          //  content: "NFT MINTED: " + submit,
+          //});
         }
       })
-      */
     })
 
   } catch (error) {
