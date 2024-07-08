@@ -24,7 +24,8 @@ class XrplHelpers {
 
   async getLiveTokenPrice(base) {
     try {
-      const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
+      //const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
+      const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=D&tf=ISO'; // not enough activity to get hourly data
       const response = await axios.get(url);
       if ('error' in response.data) {
         return 0;
