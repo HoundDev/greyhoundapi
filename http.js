@@ -1334,10 +1334,11 @@ app.post("/mint/mint_txn", async function (req, res, next) {
       pool.query("UPDATE nfts_requests SET `status` = 'active' WHERE id = ?", [pid]);
       await updateNftId(rnft.id, nftId); //update nft id in db
 
-      res.send({ nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num });
-
       //remove from currently minting
       currentlyMinting.delete(address);
+
+      res.send({ nft_id: nftId, offer: offer, nft_image: nftImage, num: rnft.num });      
+      return;
     }
     else {
       return;
@@ -1347,7 +1348,7 @@ app.post("/mint/mint_txn", async function (req, res, next) {
     if (error.data.error === "txnNotFound") {
       console.log("txn not found");
       res.send({ pending: true, error: true })
-      currentlyMinting
+      return;
     }
   }
 });
@@ -1742,7 +1743,9 @@ async function checkNotBurn(address) {
         }
       }
     }
-    while (marker) {
+
+    // keep checking if the precheck didn't yield anything and until we find one
+    while (txns.length == 0 && marker) {
       // console.log("Getting transactions for account: " + address + " marker: " + markerValue)
       const response = await client.request({
         command: "account_tx",
