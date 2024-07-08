@@ -1146,10 +1146,7 @@ app.get("/mint/pending", async function (req, res, next) {
     //   res.send({error: true});
     //   return;
     // }
-    if (currentlyMinting.get(address) === true) {
-      res.send({ status: "minting" });
-      return;
-    }
+
     console.log(`querying for address: ${address}`);
     const pending = await pool.query("SELECT r.id AS request_id, bt.id AS burnt_id, mt.id AS mint_id, ot.id AS offer_id, ct.id AS claim_id FROM nfts_requests r LEFT JOIN nfts_requests_transactions bt ON bt.request_id = r.id AND bt.`status` = 'tesSUCCESS' AND bt.`action` = 'BURN' LEFT JOIN nfts_requests_transactions mt ON mt.request_id = r.id AND mt.`status` = 'tesSUCCESS' AND mt.`action` = 'MINT' LEFT JOIN nfts_requests_transactions ot ON ot.request_id = r.id AND ot.`status` = 'tesSUCCESS' AND ot.`action` = 'OFFER' LEFT JOIN nfts_requests_transactions ct ON ct.request_id = r.id AND ct.`status` = 'tesSUCCESS' AND ct.`action` = 'CLAIM' WHERE r.wallet = ? AND r.`status` != 'tesSUCCESS' GROUP BY r.id", [address]);
     // console.log(pending[0])
@@ -1170,6 +1167,19 @@ app.get("/mint/pending", async function (req, res, next) {
     const pid = objectR.request_id;
     //encrypt pid
     let encryptedPid = encrypt(`${pid}`, process.env.ENC_PASSWORD);
+
+    if (currentlyMinting.get(address) === true) {
+
+      //remove it if we already have it minted
+      if( objectR.mint_id != null ){
+        currentlyMinting.delete(address);
+      }
+      //otherwise we're still minting
+      else{
+        res.send({ status: "minting" });
+        return;
+      }
+    }
 
     if (objectR.request_id != null && objectR.claim_id == null && objectR.offer_id == null && objectR.mint_id == null && objectR.burnt_id == null) {
       console.log('hit 11')
