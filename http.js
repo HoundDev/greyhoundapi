@@ -23,6 +23,7 @@ const { parse } = require('csv-parse');
 let mariadb = require('mariadb');
 const crypto = require('crypto');
 const { convertStringToHex } = require("xrpl");
+const logging = true
 
 const app = express();
 
@@ -1189,6 +1190,7 @@ app.get("/mint/pending", async function (req, res, next) {
       console.log('hit 11')
       saveToLog(address, 'Pending Request Found - Checking for Burn Transaction from /mint/pending')
       let burnsNotFound = await checkNotBurn(address);
+      saveToLog(address, 'Burn Check Results from /mint/pending:' + burnsNotFound)
       // return res.send({pending: false, burnsNotFound: burnsNotFound});
       if (burnsNotFound && burnsNotFound.length > 0) {
         saveToLog(address, 'Burn Transaction Found from /mint/pending')
@@ -1754,7 +1756,7 @@ async function checkNotBurn(address) {
     if (preCheck.result.transactions.length > 0) {
       if ('tx' in preCheck.result.transactions[0]) {
         const txn = preCheck.result.transactions[0].tx;
-        if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === env.process.BURN_AMOUNT && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
+        if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === process.env.BURN_AMOUNT && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
           // console.log("Found burn transaction: " + txn.hash);
           txns.push(preCheck.result.transactions[0]);
         }
@@ -1775,7 +1777,7 @@ async function checkNotBurn(address) {
         for (let i = 0; i < response.result.transactions.length; i++) {
           if ('tx' in response.result.transactions[i]) {
             const txn = response.result.transactions[i].tx;
-            if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === env.process.BURN_AMOUNT && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
+            if (txn.Destination === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ" && txn.Amount.value === process.env.BURN_AMOUNT && txn.Amount.currency === "47726579686F756E640000000000000000000000" && txn.Amount.issuer === "rJWBaKCpQw47vF4rr7XUNqr34i4CoXqhKJ") {
               // console.log("Found burn transaction: " + txn.hash);
               txns.push(response.result.transactions[i]);
             }
@@ -1791,7 +1793,7 @@ async function checkNotBurn(address) {
     }
     console.log(txns.length)
     await client.disconnect();
-
+    saveToLog(address, 'Burn transaction found from /mint/pending/checkNotBurn():' + txns.length)
     const txnsInDb = await pool.query("SELECT `hash` FROM nfts_requests_transactions rt INNER JOIN nfts_requests r ON r.id = rt.request_id WHERE rt.`action` = 'BURN' AND r.wallet = ?", [address]);
     const txnsInDbHashes = txnsInDb.map(txn => txn.hash);
     //find the txns that are not in the db
@@ -1799,6 +1801,7 @@ async function checkNotBurn(address) {
     console.log(txnsNotInDb.length)
     return txnsNotInDb;
   } catch (error) {
+    saveToLog(address, 'Burn transaction error from /mint/pending/checkNotBurn():' + error)
     console.log(error);
   }
 }
@@ -1839,10 +1842,12 @@ async function addToDb(address) {
 }
 
 async function saveToLog(address, data){
-  const fs = require('fs');
-  const logTime = await getTime()
+  if( logging ){
+    const fs = require('fs');
+    const logTime = await getTime()
 
-  fs.appendFileSync(`logs/${address}.txt`, logTime + ' - ' + data + '\r\n');
+    fs.appendFileSync(`logs/${address}.txt`, logTime + ' - ' + data + '\r\n');
+  }
 }
 
 async function getTime(){
