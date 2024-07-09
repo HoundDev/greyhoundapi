@@ -1763,8 +1763,8 @@ async function checkNotBurn(address) {
       }
     }
 
-    // keep checking if the precheck didn't yield anything and until we find one
-    while (txns.length == 0 && marker) {
+    // keep checking if the precheck didn't yield anything and until we the last 10
+    while (txns.length < 10 && marker) {
       // console.log("Getting transactions for account: " + address + " marker: " + markerValue)
       const response = await client.request({
         command: "account_tx",
@@ -1793,7 +1793,7 @@ async function checkNotBurn(address) {
     }
     console.log(txns.length)
     await client.disconnect();
-    saveToLog(address, 'Burn transaction found from /mint/pending/checkNotBurn():' + txns[0].tx.hash)
+    saveToLog(address, 'Burn transactions found from /mint/pending/checkNotBurn():' + txns.length)
     const txnsInDb = await pool.query("SELECT `hash` FROM nfts_requests_transactions rt INNER JOIN nfts_requests r ON r.id = rt.request_id WHERE rt.`action` = 'BURN' AND r.wallet = ?", [address]);
     const txnsInDbHashes = txnsInDb.map(txn => txn.hash);
     //find the txns that are not in the db
