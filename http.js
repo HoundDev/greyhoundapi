@@ -1179,6 +1179,7 @@ app.get("/mint/pending", async function (req, res, next) {
       }
       //otherwise we're still minting
       else{
+        saveToLog(address, 'Currently Minting from /mint/pending')
         res.send({ status: "minting" });
         return;
       }
@@ -1289,7 +1290,7 @@ app.post("/mint/burnt", async function (req, res, next) {
     let address = req.body.address;
     let txnHash = req.body.txnHash;
     let burnt = req.body.burnt;
-    saveToLog(address, 'Saving Burn Transaction:' + txnHash)
+    saveToLog(address, 'Saving Burn Transaction:' + txnHash + ' from /mint/burnt')
     console.log(`updating address: ${address} from pending to burnt`);
     let pid = parseInt(decrypt(req.body.pid, process.env.ENC_PASSWORD))
 
@@ -1854,5 +1855,5 @@ async function getTime(){
     let minutes = date_time.getMinutes();
     let seconds = date_time.getSeconds();
 
-    return (year + "-" + month + "-" + date + " " + hours + ":" + minutes + ":" + seconds);
+    return (year + "-" + month + "-" + date + " " + hours + ":" + String('00' + minutes).slice(-2) + ":" + String('00' + seconds).slice(-2));
 }
