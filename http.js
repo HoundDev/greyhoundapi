@@ -1793,7 +1793,7 @@ async function checkNotBurn(address) {
     }
     console.log(txns.length)
     await client.disconnect();
-    saveToLog(address, 'Burn transaction found from /mint/pending/checkNotBurn():' + txns.length)
+    saveToLog(address, 'Burn transaction found from /mint/pending/checkNotBurn():' + txns[0].tx.hash)
     const txnsInDb = await pool.query("SELECT `hash` FROM nfts_requests_transactions rt INNER JOIN nfts_requests r ON r.id = rt.request_id WHERE rt.`action` = 'BURN' AND r.wallet = ?", [address]);
     const txnsInDbHashes = txnsInDb.map(txn => txn.hash);
     //find the txns that are not in the db
