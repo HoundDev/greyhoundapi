@@ -1190,7 +1190,7 @@ app.get("/mint/pending", async function (req, res, next) {
       console.log('hit 11')
       saveToLog(address, 'Pending Request Found - Checking for Burn Transaction from /mint/pending')
       let burnsNotFound = await checkNotBurn(address);
-      saveToLog(address, 'Burn Check Results from /mint/pending:' + burnsNotFound)
+      saveToLog(address, 'Burn Check Results from /mint/pending:' + burnsNotFound.length)
       // return res.send({pending: false, burnsNotFound: burnsNotFound});
       if (burnsNotFound && burnsNotFound.length > 0) {
         saveToLog(address, 'Burn Transaction Found from /mint/pending')
