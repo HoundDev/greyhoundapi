@@ -1,7 +1,5 @@
 const express = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
 const fs = require("fs");
-const path = require('path')
 var http = require("http");
 var https = require("https");
 const { XummSdk } = require("xumm-sdk");
@@ -27,7 +25,7 @@ const { convertStringToHex } = require("xrpl");
 const app = express();
 
 const corsOptions = {
-  origin: process.env.WHITELIST_URL,
+  // origin: process.env.WHITELIST_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type']
 };
@@ -75,6 +73,34 @@ setInterval(function(){
 
 // Create a connection pool
 var pool = getDb();
+var poolStaking = getDbStaked();
+
+//encrypt/decrypt
+const encrypt = (text, password) => {
+  if (process.versions.openssl <= '1.0.1f') {
+      throw new Error('OpenSSL Version too old, vulnerability to Heartbleed');
+  }
+  // let iv = crypto.randomBytes(IV_LENGTH);
+  let iv = process.env.ENC_IV;
+  iv = Buffer.from(iv, 'utf8');
+  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(password), iv);
+  let encrypted = cipher.update(text);
+
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+const decrypt = (text, password) => {
+  let textParts = text.split(':');
+  let iv = Buffer.from(textParts.shift(), 'hex');
+  let encryptedText = Buffer.from(textParts.join(':'), 'hex');
+  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(password), iv);
+  let decrypted = decipher.update(encryptedText);
+
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+  return decrypted.toString();
+}
 
 xrplHelper = new XrplHelpers();
 if (!fs.existsSync("./storage.db")) {
@@ -124,9 +150,15 @@ app.use("/xumm/checksig", async function (req, res, next) {
       let guid = storage.generateUUID();
       storage.insertNewSession(db,resp.signedBy,guid,Math.floor(Date.now() / 1000))
       storage.updateSession(db,resp.signedBy,guid,Math.floor(Date.now() / 1000))
-      res.send({session: guid, xrpAddress:resp.signedBy});
+      console.log(resp.signedBy)
+      //encrypt the address
+      let encrypted = encrypt(resp.signedBy,process.env.ENC_PASSWORD);
+      console.log(encrypted);
+      res.send({session: guid, xrpAddress:resp.signedBy, token: encrypted});
     }
-  } catch {}
+  } catch (err) {
+    console.log(err);
+  }
 });
 
 app.use("/api/richlist", async function (req, res, next) {
@@ -191,6 +223,7 @@ app.use("/api/mainData", async function (req, res, next) {
         connectionTimeout: 60000
       });
     await client.connect();
+    console.log("Connected to XRPL");
     //do the same as above but exclude the prices function and check if the prices are already in cache, if not then get them
     const [GreyHoundAmount, tierLevel, transactions, account_info, account_lines, xrp_balance, tx_fees] = await Promise.all([
       storage.selectGreyHoundSum(db),
@@ -257,6 +290,109 @@ app.use("/api/mainData", async function (req, res, next) {
   }
 });
 
+app.use("/api/getHoundBalance", async function (req, res, next) {
+  try {
+    const client = new xrpl.Client(process.env.XRPL_RPC);
+    await client.connect();
+    const account_lines = await xrplHelper.getAccountLines(client,req.body.xrpAddress);
+    await client.disconnect();
+    const ghBal = account_lines.find(x => x.currency === process.env.GREYHOUND_CURRENCY && x.account === process.env.GREYHOUND_ISSUER);
+    res.send(ghBal);
+  } catch {
+    console.log("Error getting greyhound balance");
+    res.send("Error getting greyhound balance\n" + err);
+  }
+});
+
+app.use("/api/stakeNft", async function (req, res, next) {
+  try {
+    const token = req.body.token;
+    const nftids = req.body.nfts;
+    console.log(nftids);
+    console.log(token);
+
+    //decrypt the token
+    let decrypted = decrypt(token,process.env.ENC_PASSWORD);
+    console.log(decrypted);
+    //check if user exists in `users` table
+    let user = await poolStaking.query("SELECT * FROM users WHERE address = ?", [decrypted]);
+    if (user.length === 0) {
+      //add user to `users` table
+      await poolStaking.query("INSERT INTO users (xrpAddress) VALUES (?)", [decrypted]);
+      user = await poolStaking.query("SELECT * FROM users WHERE address = ?", [decrypted]);
+    }
+    
+    //add all nfts to stakedNfts, userId, nftId
+    for (let i = 0; i < nftids.length; i++) {
+      await poolStaking.query("INSERT INTO stakedNfts (userId, nftid) VALUES (?, ?)", [user[0].id, nftids[i]]);
+    }
+    res.send({success: true, message: "NFTs staked"});
+  } catch (error) {
+    console.log(error);
+    res.send({success: false});
+  }
+});
+
+app.use("/api/getStakedNfts", async function (req, res, next) {
+  try {
+    const token = req.body.token;
+    //decrypt the token
+    let decrypted = decrypt(token,process.env.ENC_PASSWORD);
+    //check if user exists in `users` table
+    let user = await poolStaking.query("SELECT * FROM users WHERE address = ?", [decrypted]);
+    if (user.length === 0) {
+      res.send({success: false, message: "User not found"});
+      return;
+    }
+    //get all nfts staked by the user
+    let nfts = await poolStaking.query("SELECT * FROM stakedNfts WHERE userId = ?", [parseInt(user[0].id.toString())]);
+    const nftidsstaked = [];
+    for (let i = 0; i < nfts.length; i++) {
+      nftidsstaked.push(nfts[i].nftid);
+    }
+    res.send({success: true, nfts: nftidsstaked});
+  } catch (error) {
+    console.log(error);
+    res.send({success: false});
+  }
+});
+
+app.use("/api/unstakesNft", async function (req, res, next) {
+  try {
+    const token = req.body.token;
+    const nftids = req.body.nfts;
+    //decrypt the token
+    let decrypted = decrypt(token,process.env.ENC_PASSWORD);
+    //check if user exists in `users` table
+    let user = await poolStaking.query("SELECT * FROM users WHERE address = ?", [decrypted]);
+    if (user.length === 0) {
+      res.send({success: false, message: "User not found"});
+      return;
+    }
+    //remove all nfts from stakedNfts, userId, nftId
+    for (let i = 0; i < nftids.length; i++) {
+      await poolStaking.query("DELETE FROM stakedNfts WHERE userId = ? AND nftid = ?", [user[0].id, nftids[i]]);
+    }
+    res.send({success: true, message: "NFTs unstaked"});
+  } catch (error) {
+    console.log(error);
+    res.send({success: false});
+  }
+});
+
+app.use("/api/updateReward", async function (req, res, next) {
+  try {
+    const password = "AuCxVWdYMD";
+    const { address, reward, password: pass, stakeIds } = req.body;
+    if (pass !== password) {
+      res.send({success: false, message: "Invalid password"});
+      return;
+    }
+  } catch (error) {
+    
+  }
+});
+
 function getDb() {
   return mariadb.createPool({
     port: process.env.DB_PORT,
@@ -266,6 +402,17 @@ function getDb() {
     database: process.env.DB_SCHEMA
   });
 }
+
+function getDbStaked() {
+  return mariadb.createPool({
+    port: process.env.DB_PORT,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_SCHEMA_STAKED
+  });
+}
+
 
 function convertHexToStr(hex) {
   var str = '';
@@ -291,12 +438,13 @@ async function getNftImage(id,uri) {
         var response = await axios.get(uri);
       } catch (error) {
         console.log('skipping')
-        return {image: "", name: ""};
+        return {image: "", name: "", tier: ""};
       }
       let data = response.data;
       //find a field named image
       let image = data.image;
       let name = data.name;
+      let tier = data.tier;
       //return the image
       if (image === undefined || image === "") {
           try {
@@ -305,8 +453,9 @@ async function getNftImage(id,uri) {
             let response = await axios.get(onTheDex);
             let data = response.data;
             let name = data.name;
-            cache.set(id, {image: imageUrl, name: name});
-            return {image: imageUrl, name: name};
+            let tier = data.tier;
+            cache.set(id, {image: imageUrl, name: name, tier: tier});
+            return {image: imageUrl, name: name, tier: tier};
           } catch (error) {
             console.log('skipping')
           }
@@ -315,8 +464,8 @@ async function getNftImage(id,uri) {
       if (image.includes("ipfs://")) {
         image = image.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
       }}
-      cache.set(id, {image: image, name: name});
-      return {image: image, name: name};
+      cache.set(id, {image: image, name: name, tier: tier});
+      return {image: image, name: name, tier: tier};
   }
   else {
         try {
@@ -350,6 +499,7 @@ app.use("/api/getnfts", async function (req, res, next) {
     const client = new xrpl.Client(process.env.XRPL_RPC);
     await client.connect();
     let nfts = await xrplHelper.getAccountNFTs(client, req.body.xrpAddress);
+    console.log(`Got ${nfts.length} NFTs`)
     await client.disconnect();
     let numNfts = nfts.length;
     nfts = nfts;
@@ -361,14 +511,22 @@ app.use("/api/getnfts", async function (req, res, next) {
       let nftId = nft.NFTokenID;
       let nftTaxon = nft.NFTokenTaxon;
       let issuer = nft.Issuer;
+      if (issuer !== process.env.GREYHOUND_MINTER || nftTaxon !== 1) {
+        continue;
+      }
       nftDict[nftId] = {taxon: nftTaxon, issuer: issuer};
       ids.push(nftId);
       uris.push(nft.URI);
     }
+    console.log(`Got ${ids.length} Greyhound NFTs`)
     let images = await getNftImagesParallel(ids,uris);
     for (let i = 0; i < numNfts; i++) {
+      if (!images[i]?.image) {
+        continue;
+      }
       nftDict[ids[i]].image = images[i].image;
       nftDict[ids[i]].name = images[i].name;
+      nftDict[ids[i]].tier = images[i].tier;
     }
     res.send(nftDict);
   } catch(err) {
@@ -962,32 +1120,6 @@ app.get("/api/getNftId", async function (req, res, next) {
   }
 });
 
-//encrypt/decrypt
-const encrypt = (text, password) => {
-  if (process.versions.openssl <= '1.0.1f') {
-      throw new Error('OpenSSL Version too old, vulnerability to Heartbleed');
-  }
-  // let iv = crypto.randomBytes(IV_LENGTH);
-  let iv = process.env.ENC_IV;
-  iv = Buffer.from(iv, 'utf8');
-  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(password), iv);
-  let encrypted = cipher.update(text);
-
-  encrypted = Buffer.concat([encrypted, cipher.final()]);
-  return iv.toString('hex') + ':' + encrypted.toString('hex');
-}
-
-const decrypt = (text, password) => {
-  let textParts = text.split(':');
-  let iv = Buffer.from(textParts.shift(), 'hex');
-  let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(password), iv);
-  let decrypted = decipher.update(encryptedText);
-
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
-
-  return decrypted.toString();
-}
 
 async function checkOffer(pid) {
   try {
