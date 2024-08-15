@@ -1144,33 +1144,6 @@ app.get("/api/getNftId", async function (req, res, next) {
   }
 });
 
-//encrypt/decrypt
-const encrypt = (text, password) => {
-  if (process.versions.openssl <= '1.0.1f') {
-    throw new Error('OpenSSL Version too old, vulnerability to Heartbleed');
-  }
-  // let iv = crypto.randomBytes(IV_LENGTH);
-  let iv = process.env.ENC_IV;
-  iv = Buffer.from(iv, 'utf8');
-  let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(password), iv);
-  let encrypted = cipher.update(text);
-
-  encrypted = Buffer.concat([encrypted, cipher.final()]);
-  return iv.toString('hex') + ':' + encrypted.toString('hex');
-}
-
-const decrypt = (text, password) => {
-  let textParts = text.split(':');
-  let iv = Buffer.from(textParts.shift(), 'hex');
-  let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-  let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(password), iv);
-  let decrypted = decipher.update(encryptedText);
-
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
-
-  return decrypted.toString();
-}
-
 async function checkOffer(pid) {
   try {
     const walletData = await pool.query("SELECT nft_id FROM nfts_requests WHERE id = ?", [pid]);
