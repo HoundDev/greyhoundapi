@@ -351,7 +351,7 @@ app.use("/api/getStakedNfts", async function (req, res, next) {
     res.send({success: true, nfts: nftidsstaked});
   } catch (error) {
     console.log(error);
-    res.send({success: false});
+    res.send({success: false, error: error});
   }
 });
 
