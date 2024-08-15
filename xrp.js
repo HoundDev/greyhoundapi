@@ -27,11 +27,15 @@ class XrplHelpers {
       //const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=60&tf=ISO';
       const url = 'https://api.onthedex.live/public/v1/ohlc?base=' + base + '&quote=XRP&bars=100&interval=D&tf=ISO'; // not enough activity to get hourly data
       const response = await axios.get(url);
+      console.log(response.data);
       if ('error' in response.data) {
         return 0;
       }
-      return response.data.data['ohlc'][response.data.data['ohlc'].length - 1].c;
-    } catch (error) {
+      if (response.data.data['ohlc'].length > 0)
+        return response.data.data['ohlc'][response.data.data['ohlc'].length - 1].c;
+      else 
+        return 0;
+} catch (error) {
       console.error(error);
       return 0;
     }
@@ -78,7 +82,7 @@ class XrplHelpers {
       }
       let response = await client.request(payload);
       account_nfts.push(...response.result.account_nfts);
-      console.log("Response length: " + response.result);
+      console.log("Response length: " + response.result.account_nfts.length);
       if (response.result.marker) {
         marker = response.result.marker;
       } else {
