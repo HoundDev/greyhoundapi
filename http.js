@@ -832,7 +832,7 @@ async function checkRarity(attributes) {
 
 app.use("/api/getnftsData", async function (req, res, next) {
   try {
-    let nftId = req.body.id;
+    let nftId = req.body.id || req.body.nftId;
     //check if nft is in cache
     if (nftId in cacheURIDATA) {
       res.send(cacheURIDATA[nftId]);
