@@ -26,7 +26,7 @@ const logging = true
 const app = express();
 
 const corsOptions = {
-  origin: process.env.WHITELIST_URL,
+  // origin: process.env.WHITELIST_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Origin', 'X-Auth-Token']
 };
@@ -408,7 +408,7 @@ function getDbStaked() {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     // database: process.env.DB_SCHEMA_STAKED
-    database: 'greyhoun_testing'
+    database: 'greyhounds'
   });
 }
 
@@ -436,7 +436,6 @@ async function getNftImage(id, uri) {
       try{
         var response = await axios.get(uri);
       } catch (error) {
-        console.log('skipping')
         return {image: "", name: "", tier: ""};
       }
       let data = response.data;
@@ -453,6 +452,7 @@ async function getNftImage(id, uri) {
             let data = response.data;
             let name = data.name;
             let tier = data.tier;
+            console.log({image: imageUrl, name: name, tier: tier})
             cache.set(id, {image: imageUrl, name: name, tier: tier});
             return {image: imageUrl, name: name, tier: tier};
           } catch (error) {
@@ -464,6 +464,7 @@ async function getNftImage(id, uri) {
         image = image.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
       }}
       cache.set(id, {image: image, name: name, tier: tier});
+      console.log({image: image, name: name, tier: tier})
       return {image: image, name: name, tier: tier};
   }
   else {
@@ -477,6 +478,7 @@ async function getNftImage(id, uri) {
       let attr = data.attributes;
       let coll = data.collection;
       cache.set(id, { image: imageUrl, name: name, attributes: attr, collection: coll });
+      console.log({ image: imageUrl, name: name, attributes: attr, collection: coll });
       return { image: imageUrl, name: name, attributes: attr, collection: coll };
     } catch (error) {
       console.log('skipping')
@@ -841,19 +843,10 @@ app.use("/api/getnftsData", async function (req, res, next) {
     if (nftId in cacheURIDATA) {
       res.send(cacheURIDATA[nftId]);
     } else {
-      // let address = req.body.address;
-      //const url = `https://marketplace-api.onxrp.com/api/nfts/${nftId}?include=owner%2CcreatedBy%2CnftAttributes%2Ccollection%2CnftActivities%2Coffers%2Claunchpad&refresh=true`
-      //const response = await axios.get(url);
-      //const name = response.data.data.name; //#Houndies #xxxx
-      //const nftNum = name.split(" ")[1].replace("#", "");
-      //const taxon = response.data.data.taxon;
-      //const address = response.data.data.owner.wallet_id;
-
       const taxon = 1;
       const address = ''; //temp
       const nftInfoRecords = await pool.query("SELECT num FROM nfts WHERE nftid = ?", [nftId]);
       const nftNum = nftInfoRecords[0].num;
-
 
       //metadata for all nfts is stored in .dashboard.cache/metadata/num.json
       let metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
