@@ -408,7 +408,7 @@ function getDbStaked() {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     // database: process.env.DB_SCHEMA_STAKED
-    database: "greyhoun_testing"
+    database: 'greyhoun_testing'
   });
 }
 
