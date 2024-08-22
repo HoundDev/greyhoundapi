@@ -872,7 +872,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
           "rarity": rarity,
           "tier": tierNFT,
           "anim": animFlag,
-          "taxon": taxon
+          "taxon": taxon,
+          "id": nftId
         }
         // console.log(nftDataDict);
         cacheURIDATA[nftId] = nftDataDict;
