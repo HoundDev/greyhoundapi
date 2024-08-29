@@ -27,7 +27,7 @@ const app = express();
 const corsOptions = {
   // origin: process.env.WHITELIST_URL,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
 app.use(cors(corsOptions));
@@ -150,14 +150,26 @@ app.use("/xumm/checksig", async function (req, res, next) {
       let guid = storage.generateUUID();
       storage.insertNewSession(db,resp.signedBy,guid,Math.floor(Date.now() / 1000))
       storage.updateSession(db,resp.signedBy,guid,Math.floor(Date.now() / 1000))
-      console.log(resp.signedBy)
       //encrypt the address
       let encrypted = encrypt(resp.signedBy,process.env.ENC_PASSWORD);
-      console.log(encrypted);
       res.send({session: guid, xrpAddress:resp.signedBy, token: encrypted});
     }
   } catch (err) {
     console.log(err);
+  }
+});
+//verify the token and return the xrp address
+app.use("/api/auth", async function (req, res, next) {
+  try {
+    let token = req.headers.authorization.split(" ")[1];
+    console.log(token)
+    let decrypted = decrypt(token,process.env.ENC_PASSWORD);
+    console.log(decrypted)
+    let xrpAddress = decrypted;
+    res.send({success: true, xrpAddress: xrpAddress});
+  } catch (err) {
+    console.log(err);
+    res.send({success: false, message: "Invalid token"});
   }
 });
 
