@@ -246,6 +246,7 @@ app.use("/api/mainData", async function (req, res, next) {
       xrplHelper.getBalance(client,req.body.xrpAddress),
       xrplHelper.getTransactionFee(client),
     ]);
+    console.log('got all data')
     if (priceCache.get('xrpprices') === undefined) {
       var xrpprices = await xrplHelper.getTokenPrice('XRP', 'USD.rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq', client);
       priceCache.set('xrpprices', xrpprices);
@@ -527,20 +528,20 @@ app.use("/api/getnfts", async function (req, res, next) {
       if (issuer !== process.env.GREYHOUND_MINTER || nftTaxon !== 1) {
         continue;
       }
-      nftDict[nftId] = {taxon: nftTaxon, issuer: issuer};
+      nftDict[nftId] = {taxon: nftTaxon, issuer: issuer, uri: nft.URI};
       ids.push(nftId);
       uris.push(nft.URI);
     }
     console.log(`Got ${ids.length} Greyhound NFTs`)
-    let images = await getNftImagesParallel(ids,uris);
-    for (let i = 0; i < numNfts; i++) {
-      if (!images[i]?.image) {
-        continue;
-      }
-      nftDict[ids[i]].image = images[i].image;
-      nftDict[ids[i]].name = images[i].name;
-      nftDict[ids[i]].tier = images[i].tier;
-    }
+    // let images = await getNftImagesParallel(ids,uris);
+    // for (let i = 0; i < numNfts; i++) {
+    //   if (!images[i]?.image) {
+    //     continue;
+    //   }
+    //   nftDict[ids[i]].image = images[i].image;
+    //   nftDict[ids[i]].name = images[i].name;
+    //   nftDict[ids[i]].tier = images[i].tier;
+    // }
     res.send(nftDict);
   } catch(err) {
     console.log(err)
@@ -850,15 +851,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
     if (nftId in cacheURIDATA) {
       res.send(cacheURIDATA[nftId]);
     } else {
-        // let address = req.body.address;
-        const url = `https://marketplace-api.onxrp.com/api/nfts/${nftId}?include=owner%2CcreatedBy%2CnftAttributes%2Ccollection%2CnftActivities%2Coffers%2Claunchpad&refresh=true`
-        const response = await axios.get(url);
-        const name = response.data.data.name; //#Houndies #xxxx
-        const nftNum = name.split(" ")[1].replace("#", "");
-        const taxon = response.data.data.taxon;
-        // const attributes = await checkRarity(response.data.data.nftAttributes);
-        const address = response.data.data.owner.wallet_id;
-        //metadata for all nfts is stored in .dashboard.cache/metadata/num.json
+        const nft = await getNftFromDb(nftId);
+        const nftNum = nft.num;
         let metadata = fs.readFileSync(`../.dashboard.cache/metadata/${nftNum}.json`, 'utf8');
         metadata = JSON.parse(metadata);
         const rarity = metadata.rarity;
@@ -874,9 +868,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
         const attributes = await checkRarity(metadata.attributes);
         let nftDataDict = {
           "image": image,
-          "name": name,
+          "name": metadata.name,
           "attributes": attributes,
-          "owner": address,
           "collection":{
             "name": "collection",
             "description": "Houndies is a collection of 10,000 greyhound avatar NFTs living on the XRPL. Inspired by street art and contemporary design, the collection was crafted by one artist with a singular vision. Each piece of original digital art has its own personality and a unique combination of attributes from a pool of over 200 traits."
@@ -884,10 +877,9 @@ app.use("/api/getnftsData", async function (req, res, next) {
           "rarity": rarity,
           "tier": tierNFT,
           "anim": animFlag,
-          "taxon": taxon,
+          "taxon": metadata.taxon,
           "id": nftId
         }
-        // console.log(nftDataDict);
         cacheURIDATA[nftId] = nftDataDict;
         res.send(nftDataDict);
     }
@@ -1117,6 +1109,16 @@ async function getNftIdFromDb(nftNum) {
     const dbQuery = await pool.query(`SELECT nftid FROM nfts WHERE num = ?`, [nftNum]);
     const nftId = dbQuery[0].nftid;
     return nftId;
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+async function getNftFromDb(nftId) {
+  try {
+    const dbQuery = await pool.query(`SELECT * FROM nfts WHERE nftid = ?`, [nftId]);
+    const nft = dbQuery[0];
+    return nft;
   } catch (error) {
     console.log(error);
   }
