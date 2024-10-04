@@ -1116,8 +1116,14 @@ async function getNftIdFromDb(nftNum) {
 
 async function getNftFromDb(nftId) {
   try {
+    //check if nftid is in cache
+    const key = `nftQuery:${nftId}`;
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
     const dbQuery = await pool.query(`SELECT * FROM nfts WHERE nftid = ?`, [nftId]);
     const nft = dbQuery[0];
+    cache.set(key, nft);
     return nft;
   } catch (error) {
     console.log(error);
