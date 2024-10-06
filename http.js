@@ -2797,7 +2797,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
     let nftId = req.body.id || req.body.nftId;
     //check if nft is in cache
     if (nftId in cacheURIDATA) {
-      res.send(cacheURIDATA[nftId]);
+      // res.send(cacheURIDATA[nftId]);
+      res.send({...cacheURIDATA[nftId], cached: true});
     } else {
         const nft = await getNftFromDb(nftId);
         const nftNum = nft.num;
