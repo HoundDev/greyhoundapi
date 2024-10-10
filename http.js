@@ -30,7 +30,7 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions));
 
 const PORT = process.env.API_SERVICE_PORT;
 const API_SERVICE_URL = process.env.API_SERVICE_URL;
