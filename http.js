@@ -25,9 +25,10 @@ const { convertStringToHex } = require("xrpl");
 const app = express();
 
 const corsOptions = {
-  origin: "*",
+  origin: ["https://greyhounddashboard.vercel.app", "https://app.greyhoundcoin.net"],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  
 };
 
 app.use(cors(corsOptions));
