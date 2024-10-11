@@ -2807,9 +2807,9 @@ app.use("/api/getnftsData", async function (req, res, next) {
       return;
     }
     //check if nft is in cache
-    if (nftId in cacheURIDATA) {
+    if (nftId in cache) {
       // res.send(cacheURIDATA[nftId]);
-      res.send({...cacheURIDATA[nftId], cached: true});
+      res.send({...cache[nftId], cached: true});
     } else {
         const nft = await getNftFromDb(nftId);
         const nftNum = nft.num;
@@ -2840,7 +2840,8 @@ app.use("/api/getnftsData", async function (req, res, next) {
           "taxon": metadata.taxon,
           "id": nftId
         }
-        cacheURIDATA[nftId] = nftDataDict;
+        cache[nftId] = nftDataDict;
+        res.setHeader('Cache-Control', 'max-age=3600');
         res.send(nftDataDict);
     }
   } catch (err) {
