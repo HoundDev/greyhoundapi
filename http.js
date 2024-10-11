@@ -25,7 +25,7 @@ const { convertStringToHex } = require("xrpl");
 const app = express();
 
 const corsOptions = {
-  origin: ["https://greyhounddashboard.vercel.app", "https://app.greyhoundcoin.net"],
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   
@@ -2109,6 +2109,12 @@ app.use("/xumm/checksig", async function (req, res, next) {
     console.log(err);
   }
 });
+
+app.use("/xumm/createToken", async function (req, res, next) {
+  const address = req.body.address;
+  const token = encrypt(address,process.env.ENC_PASSWORD);
+  res.send({token: token});
+});
 //verify the token and return the xrp address
 app.use("/api/auth", async function (req, res, next) {
   try {
@@ -2796,6 +2802,10 @@ async function checkRarity(attributes) {
 app.use("/api/getnftsData", async function (req, res, next) {
   try {
     let nftId = req.body.id || req.body.nftId;
+    if (nftId === "error") {
+      res.send({error: "error"});
+      return;
+    }
     //check if nft is in cache
     if (nftId in cacheURIDATA) {
       // res.send(cacheURIDATA[nftId]);
@@ -3071,8 +3081,10 @@ async function getNftFromDb(nftId) {
     if (cache.has(key)) {
       return cache.get(key);
     }
-    const dbQuery = await pool.query(`SELECT * FROM nfts WHERE nftid = ?`, [nftId]);
-    const nft = dbQuery[0];
+
+    //read from nfts.json
+    const nfts = JSON.parse(fs.readFileSync('./nfts.json', 'utf8'));
+    const nft = nfts.find(nft => nft.nftid === nftId);
     cache.set(key, nft);
     return nft;
   } catch (error) {
